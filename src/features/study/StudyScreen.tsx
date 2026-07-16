@@ -1,0 +1,6 @@
+import { Pressable, StyleSheet, View } from 'react-native'; import { Card } from '@/shared/components/Card'; import { Screen } from '@/shared/components/Screen'; import { Body, Heading, Muted, Title } from '@/shared/components/Typography'; import { theme } from '@/shared/theme';
+export function StudyScreen() { return <Screen><Title>??</Title><Muted>??? ?? ??? ??? ??? ?????.</Muted><Card><Heading>?? ??</Heading><View style={styles.chips}>{['?? ??', '?? ??', '?? ??'].map((x,i)=><View key={x} style={[styles.chip,i===0&&styles.selected]}><Body>{x}</Body></View>)}</View></Card><Card><Heading>?? ??</Heading><Body>60?</Body><Muted>???? ? 1?? ????.</Muted></Card><View style={styles.book}><Body>?? ?? ?? ??</Body><Muted>?? ? ? 4 / 6 ???</Muted></View><Pressable style={styles.button}><Body>?? ??</Body></Pressable></Screen>; }
+const styles=StyleSheet.create({chips:{flexDirection:'row',flexWrap:'wrap',gap:8},chip:{paddingHorizontal:12,paddingVertical:8,borderRadius:20,borderWidth:1,borderColor:theme.colors.border},selected:{backgroundColor:theme.colors.primarySoft,borderColor:theme.colors.primary},book:{alignItems:'center',padding:24,gap:8},button:{alignItems:'center',padding:16,borderRadius:theme.radius.md,backgroundColor:theme.colors.primarySoft}});
+
+
+

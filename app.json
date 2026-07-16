@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "MoveOn",
+    "slug": "moveon",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "moveon",
+    "userInterfaceStyle": "light",
+    "plugins": ["expo-router"],
+    "experiments": { "typedRoutes": true },
+    "ios": { "supportsTablet": true },
+    "android": { "adaptiveIcon": { "backgroundColor": "#F7F3E8" } },
+    "web": { "bundler": "metro" }
+  }
+}

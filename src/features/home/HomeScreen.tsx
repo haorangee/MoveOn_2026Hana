@@ -1,0 +1,8 @@
+import { StyleSheet, View } from 'react-native'; import { Card } from '@/shared/components/Card'; import { Screen } from '@/shared/components/Screen'; import { Body, Heading, Muted, Title } from '@/shared/components/Typography'; import { theme } from '@/shared/theme';
+const quests = ['? ? ? ???', '????', '25? ????'];
+export function HomeScreen() { return <Screen><Title>?? ?????, ???</Title><Muted>??? ? ???? ??? ????.</Muted><Card><Heading>??? ???</Heading><View style={styles.character}><Body>?? ???? ???</Body><Muted>Lv. 4 ? ??? 320 ? ??? 48</Muted></View></Card><Heading>??? ???</Heading>{quests.map((quest, index) => <Card key={quest}><Body>{index === 0 ? '?' : '?'} {quest}</Body><Muted>?? ?? ? ??? 10 / ??? 3</Muted></Card>)}<Card><Heading>??? ??</Heading><Body>?? 42? ? 4???</Body><Muted>?? ????? 8?</Muted></Card></Screen>; }
+const styles = StyleSheet.create({ character: { padding: theme.spacing.md, borderRadius: theme.radius.md, backgroundColor: theme.colors.primarySoft, gap: theme.spacing.xs } });
+
+
+
+

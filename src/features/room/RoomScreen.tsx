@@ -1,0 +1,4 @@
+import { StyleSheet, View } from 'react-native'; import { Card } from '@/shared/components/Card'; import { Screen } from '@/shared/components/Screen'; import { Body, Heading, Muted, Title } from '@/shared/components/Typography'; import { theme } from '@/shared/theme';
+export function RoomScreen(){return <Screen><Title>?? ?</Title><Muted>??? ??? ???? ??? ?? ???.</Muted><View style={styles.room}><Body>??      ??</Body><Body>?? ??   ?????</Body><Body>???       ??</Body></View><Card><Heading>?? ??</Heading><Body>??? ? 8?</Body><Muted>??? ???? 22? ????.</Muted></Card><Card><Heading>? ??</Heading><Body>??? 72% ? ??? ??? 84%</Body></Card></Screen>}
+const styles=StyleSheet.create({room:{minHeight:250,justifyContent:'space-around',padding:28,borderRadius:theme.radius.lg,backgroundColor:'#EADFC8',borderWidth:1,borderColor:theme.colors.border}});
+
