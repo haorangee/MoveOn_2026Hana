@@ -1,50 +1,55 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { RoomScene } from '@/features/home/components/RoomScene';
-import { ObjectInteractionSheet } from '@/features/home/components/ObjectInteractionSheet';
-import type { RoomObject } from '@/features/home/roomData';
+import type { RoomHotspot } from '@/features/home/roomData';
 
 export function HomeScreen() {
   const router = useRouter();
-  const [selectedObject, setSelectedObject] = useState<RoomObject | null>(null);
+  const [focusedObject, setFocusedObject] = useState<RoomHotspot | null>(null);
+  const [systemMessage, setSystemMessage] = useState<string | null>(null);
+  const actionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const messageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handlePrimaryAction = () => {
-    if (!selectedObject) return;
+  useEffect(() => () => {
+    if (actionTimer.current) clearTimeout(actionTimer.current);
+    if (messageTimer.current) clearTimeout(messageTimer.current);
+  }, []);
 
-    const route = selectedObject.route;
-    setSelectedObject(null);
+  const handleObjectPress = (object: RoomHotspot) => {
+    if (actionTimer.current) clearTimeout(actionTimer.current);
+    setSystemMessage(null);
+    setFocusedObject(object);
 
-    if (route) {
-      router.push(route);
-    }
+    actionTimer.current = setTimeout(() => {
+      if (object.route) {
+        router.push(object.route);
+        setFocusedObject(null);
+        return;
+      }
+
+      actionTimer.current = setTimeout(() => setFocusedObject(null), 2600);
+    }, 1350);
+  };
+
+  const handleSettingsPress = () => {
+    if (messageTimer.current) clearTimeout(messageTimer.current);
+    setSystemMessage('내 방 설정은 다음 업데이트에서 열릴 예정이에요.');
+    messageTimer.current = setTimeout(() => setSystemMessage(null), 2600);
   };
 
   return (
     <View style={styles.container}>
       <RoomScene
-        onObjectPress={setSelectedObject}
-        onSettingsPress={() => setSelectedObject({
-          id: 'settings',
-          title: '설정',
-          description: '알림과 화면 설정은 다음 단계에서 연결할 예정이에요.',
-          actionLabel: '확인',
-          icon: 'settings-outline',
-        })}
-      />
-
-      <ObjectInteractionSheet
-        object={selectedObject}
-        onClose={() => setSelectedObject(null)}
-        onPrimaryAction={handlePrimaryAction}
+        focusedObject={focusedObject}
+        onObjectPress={handleObjectPress}
+        onSettingsPress={handleSettingsPress}
+        systemMessage={systemMessage}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F4EDE1',
-  },
+  container: { flex: 1, backgroundColor: '#F4EDE1' },
 });

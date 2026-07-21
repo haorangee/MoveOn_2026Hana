@@ -1,7 +1,7 @@
 import { Asset } from 'expo-asset';
 import { Image, Platform, StyleSheet, View } from 'react-native';
 
-const roomImage = require('../../../../assets/images/room/moveon-room-home.png');
+const roomImage = require('../../../../assets/images/room/moveon-room-empty.png');
 
 type RoomBackdropProps = {
   overlayOpacity?: number;

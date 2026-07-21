@@ -1,70 +1,122 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-const quests = ['샤워하기', '방청소하기', '물 마시기'];
+const quests = [
+  { title: '샤워하기', done: true, color: '#E8C99D' },
+  { title: '방 청소하기', done: false, color: '#D8DFAF' },
+  { title: '물 마시기', done: false, color: '#D7C3A7' },
+];
 
 export function QuestMemoBoard() {
   return (
-    <View style={styles.paper} pointerEvents="none">
-      <View style={styles.tape} />
-      <Text style={styles.title}>오늘의 퀘스트</Text>
-      {quests.map((quest) => (
-        <View key={quest} style={styles.questRow}>
-          <View style={styles.questDot} />
-          <Text style={styles.questText}>{quest}</Text>
-        </View>
-      ))}
+    <View accessibilityLabel="벽에 붙은 오늘의 퀘스트 메모" pointerEvents="none" style={styles.board}>
+      <View style={styles.boardGrain} />
+      <View style={[styles.pin, styles.leftPin]} />
+      <View style={[styles.pin, styles.rightPin]} />
+      <Text style={styles.heading}>오늘의 작은 일</Text>
+      <View style={styles.notes}>
+        {quests.map((quest, index) => (
+          <View
+            key={quest.title}
+            style={[
+              styles.note,
+              { backgroundColor: quest.color },
+              index === 0 && styles.noteOne,
+              index === 1 && styles.noteTwo,
+              index === 2 && styles.noteThree,
+            ]}
+          >
+            <View style={styles.tape} />
+            <Text style={[styles.noteText, quest.done && styles.doneText]}>
+              {quest.done ? '✓ ' : '○ '}{quest.title}
+            </Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  paper: {
+  board: {
     position: 'absolute',
-    left: 16,
-    top: 86,
-    width: 116,
-    paddingHorizontal: 13,
-    paddingTop: 19,
-    paddingBottom: 13,
-    borderRadius: 4,
-    backgroundColor: 'rgba(243, 222, 175, 0.92)',
-    transform: [{ rotate: '-1.5deg' }],
-    shadowColor: '#493B2B',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 7,
-    elevation: 3,
+    right: '4.5%',
+    top: '14.5%',
+    width: '20%',
+    height: '14.5%',
+    paddingHorizontal: 5,
+    paddingTop: 8,
+    borderWidth: 3,
+    borderColor: '#7E5F42',
+    borderRadius: 3,
+    overflow: 'hidden',
+    backgroundColor: '#A9825B',
+    transform: [{ perspective: 500 }, { rotateY: '-2deg' }, { rotate: '0.5deg' }],
+    shadowColor: '#3B2B1D',
+    shadowOffset: { width: 2, height: 4 },
+    shadowOpacity: 0.24,
+    shadowRadius: 5,
+    elevation: 2,
   },
-  tape: {
+  boardGrain: {
     position: 'absolute',
-    top: -6,
-    left: 39,
-    width: 38,
-    height: 13,
-    backgroundColor: 'rgba(238, 229, 208, 0.82)',
-    transform: [{ rotate: '2deg' }],
+    left: 5,
+    right: 5,
+    top: '48%',
+    height: 1,
+    backgroundColor: 'rgba(77, 51, 31, 0.18)',
   },
-  title: {
-    marginBottom: 9,
-    color: '#504434',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  questRow: {
-    minHeight: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  questDot: {
+  pin: {
+    position: 'absolute',
+    top: 3,
     width: 5,
     height: 5,
     borderRadius: 3,
-    backgroundColor: '#8B7658',
+    backgroundColor: '#8B433A',
+    borderWidth: 1,
+    borderColor: '#69312A',
   },
-  questText: {
-    color: '#5A4C3A',
-    fontSize: 10,
-    fontWeight: '600',
+  leftPin: { left: 5 },
+  rightPin: { right: 5 },
+  heading: {
+    color: '#FFF3DB',
+    fontSize: 6,
+    fontWeight: '900',
+    textAlign: 'center',
+    letterSpacing: 0.3,
+  },
+  notes: {
+    flex: 1,
+    marginTop: 3,
+    justifyContent: 'space-around',
+  },
+  note: {
+    minHeight: 15,
+    paddingHorizontal: 3,
+    paddingVertical: 3,
+    borderRadius: 1,
+    shadowColor: '#4A3522',
+    shadowOffset: { width: 1, height: 1 },
+    shadowOpacity: 0.18,
+    shadowRadius: 1,
+  },
+  noteOne: { width: '82%', transform: [{ rotate: '-1deg' }] },
+  noteTwo: { width: '88%', alignSelf: 'flex-end', transform: [{ rotate: '1.2deg' }] },
+  noteThree: { width: '76%', transform: [{ rotate: '-0.5deg' }] },
+  tape: {
+    position: 'absolute',
+    top: -2,
+    left: '38%',
+    width: 13,
+    height: 4,
+    backgroundColor: 'rgba(244, 229, 194, 0.72)',
+  },
+  noteText: {
+    color: '#544535',
+    fontSize: 5.5,
+    fontWeight: '800',
+  },
+  doneText: {
+    color: '#766353',
+    textDecorationLine: 'line-through',
   },
 });

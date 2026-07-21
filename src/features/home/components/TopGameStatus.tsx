@@ -1,19 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { getCharacterOption } from '@/features/onboarding/onboardingData';
+import { useOnboarding } from '@/features/onboarding/OnboardingProvider';
 
 type TopGameStatusProps = {
   onSettingsPress: () => void;
 };
 
 export function TopGameStatus({ onSettingsPress }: TopGameStatusProps) {
+  const { profile } = useOnboarding();
+  const character = getCharacterOption(profile.characterId);
+
   return (
     <View style={styles.container} pointerEvents="box-none">
       <View style={styles.identityPill}>
         <View style={styles.avatar}>
-          <Ionicons name="leaf" size={16} color="#6F795B" />
+          <Image contentFit="contain" source={character.image} style={styles.avatarImage} />
         </View>
         <View>
-          <Text style={styles.roomName}>소정의 방</Text>
+          <Text style={styles.roomName}>{profile.name || '나'}의 방</Text>
           <Text style={styles.level}>LV. 4 · 320 / 600</Text>
         </View>
       </View>
@@ -63,7 +69,7 @@ const styles = StyleSheet.create({
     paddingRight: 16,
     paddingLeft: 7,
     borderRadius: 28,
-    backgroundColor: 'rgba(255, 252, 243, 0.92)',
+    backgroundColor: 'rgba(255, 252, 243, 0.9)',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
@@ -78,39 +84,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(92, 75, 54, 0.14)',
+    overflow: 'hidden',
   },
-  roomName: {
-    color: '#332D26',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  level: {
-    marginTop: 2,
-    color: '#7A6E60',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  right: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
+  avatarImage: { width: '100%', height: '135%', marginTop: 8 },
+  roomName: { color: '#332D26', fontSize: 14, fontWeight: '800' },
+  level: { marginTop: 2, color: '#7A6E60', fontSize: 10, fontWeight: '600' },
+  right: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   coinPill: {
     height: 43,
     minWidth: 78,
     paddingHorizontal: 13,
     borderRadius: 22,
-    backgroundColor: 'rgba(255, 252, 243, 0.92)',
+    backgroundColor: 'rgba(255, 252, 243, 0.9)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 9,
     ...pillShadow,
   },
-  grape: {
-    width: 17,
-    height: 19,
-  },
+  grape: { width: 17, height: 19 },
   grapeDot: {
     position: 'absolute',
     width: 9,
@@ -123,22 +115,15 @@ const styles = StyleSheet.create({
   dotOne: { left: 0, top: 2 },
   dotTwo: { right: 0, top: 2 },
   dotThree: { left: 4, bottom: 0 },
-  coinText: {
-    color: '#332D26',
-    fontSize: 15,
-    fontWeight: '800',
-  },
+  coinText: { color: '#332D26', fontSize: 15, fontWeight: '800' },
   settings: {
     width: 43,
     height: 43,
     borderRadius: 22,
-    backgroundColor: 'rgba(255, 252, 243, 0.92)',
+    backgroundColor: 'rgba(255, 252, 243, 0.9)',
     alignItems: 'center',
     justifyContent: 'center',
     ...pillShadow,
   },
-  pressed: {
-    transform: [{ scale: 0.94 }],
-    opacity: 0.86,
-  },
+  pressed: { transform: [{ scale: 0.94 }], opacity: 0.86 },
 });
