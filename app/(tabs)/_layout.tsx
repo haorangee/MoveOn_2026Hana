@@ -8,7 +8,10 @@ export default function TabLayout() {
     tabBarStyle: { height: 66, paddingTop: 7, paddingBottom: 8, backgroundColor: theme.colors.surface },
     tabBarIcon: ({ color, size }) => <Ionicons name={icons[route.name as keyof typeof icons]} color={color} size={size} />,
   })}>
-    <Tabs.Screen name="index" options={{ title: '홈' }} />
+    <Tabs.Screen
+      name="index"
+      options={{ title: '홈', tabBarStyle: { display: 'none' } }}
+    />
     <Tabs.Screen name="study" options={{ title: '공부' }} />
     <Tabs.Screen name="room" options={{ title: '방' }} />
     <Tabs.Screen name="story" options={{ title: '스토리' }} />
