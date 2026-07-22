@@ -19,6 +19,7 @@ export const studyCategories: StudyCategory[] = [
 
 export const PRODUCTION_SECONDS_PER_PAGE = PROGRESSION.secondsPerPage;
 export const DEVELOPMENT_SECONDS_PER_PAGE = 10;
+export const DEFAULT_STUDY_DURATION_SECONDS = 25 * 60;
 
 export type StudySessionState = {
   startedAt: number | null;
@@ -26,6 +27,8 @@ export type StudySessionState = {
   isRunning: boolean;
   isPaused: boolean;
   category: StudyCategory;
+  targetDurationSeconds: number;
+  remainingSeconds: number;
   completedPages: number;
   currentPageProgress: number;
   secondsPerPage: number;
@@ -37,6 +40,7 @@ export type StudySessionResult = {
   elapsedMs: number;
   elapsedSeconds: number;
   category: StudyCategory;
+  targetDurationSeconds: number;
   completedPages: number;
   currentPageProgress: number;
 };
@@ -62,17 +66,27 @@ export function calculateStudyProgress(
 export function createStudySessionState(
   category: StudyCategory = studyCategories[0],
   secondsPerPage: number = PRODUCTION_SECONDS_PER_PAGE,
+  targetDurationSeconds: number = DEFAULT_STUDY_DURATION_SECONDS,
 ): StudySessionState {
+  const safeTargetDurationSeconds = Math.max(1, targetDurationSeconds);
+
   return {
     startedAt: null,
     elapsedMs: 0,
     isRunning: false,
     isPaused: false,
     category,
+    targetDurationSeconds: safeTargetDurationSeconds,
+    remainingSeconds: safeTargetDurationSeconds,
     completedPages: 0,
     currentPageProgress: 0,
     secondsPerPage,
   };
+}
+
+export function getRemainingStudySeconds(elapsedMs: number, targetDurationSeconds: number) {
+  const elapsedSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
+  return Math.max(0, targetDurationSeconds - elapsedSeconds);
 }
 
 export function refreshStudySession(
@@ -81,10 +95,18 @@ export function refreshStudySession(
 ): StudySessionState {
   if (!state.isRunning || state.startedAt === null) return state;
 
-  const elapsedMs = Math.max(0, now - state.startedAt);
+  const targetMs = state.targetDurationSeconds * 1000;
+  const elapsedMs = Math.min(Math.max(0, now - state.startedAt), targetMs);
+  const remainingSeconds = getRemainingStudySeconds(elapsedMs, state.targetDurationSeconds);
+  const isComplete = remainingSeconds === 0;
+
   return {
     ...state,
+    startedAt: isComplete ? null : state.startedAt,
     elapsedMs,
+    isRunning: !isComplete,
+    isPaused: false,
+    remainingSeconds,
     ...calculateStudyProgress(elapsedMs, state.secondsPerPage),
   };
 }
@@ -105,12 +127,14 @@ export function pauseStudySession(
   state: StudySessionState,
   now = Date.now(),
 ): StudySessionState {
+  if (!state.isRunning) return state;
+
   const refreshed = refreshStudySession(state, now);
   return {
     ...refreshed,
     startedAt: null,
     isRunning: false,
-    isPaused: true,
+    isPaused: refreshed.remainingSeconds > 0,
   };
 }
 
@@ -141,6 +165,7 @@ export function finishStudySession(
       elapsedMs: refreshed.elapsedMs,
       elapsedSeconds: Math.floor(refreshed.elapsedMs / 1000),
       category: refreshed.category,
+      targetDurationSeconds: refreshed.targetDurationSeconds,
       completedPages: refreshed.completedPages,
       currentPageProgress: refreshed.currentPageProgress,
     },
@@ -159,6 +184,8 @@ export function formatElapsedTime(elapsedMs: number) {
 }
 
 export function getSecondsUntilNextPage(state: StudySessionState) {
+  if (state.remainingSeconds === 0) return 0;
+
   const elapsedSeconds = state.elapsedMs / 1000;
   const secondsIntoPage = elapsedSeconds % state.secondsPerPage;
   return Math.max(0, Math.ceil(state.secondsPerPage - secondsIntoPage));

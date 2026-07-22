@@ -1,13 +1,19 @@
 import { Asset } from 'expo-asset';
+import { useMemo } from 'react';
 import { Image, Platform, StyleSheet, View } from 'react-native';
 
-const roomImage = require('../../../../assets/images/room/moveon-room-empty.png');
+const dayRoomImage = require('../../../../assets/images/room/moveon-room-empty.png');
+const nightRoomImage = require('../../../../assets/images/room/moveon-room-night.png');
 
 type RoomBackdropProps = {
   overlayOpacity?: number;
 };
 
 export function RoomBackdrop({ overlayOpacity = 0 }: RoomBackdropProps) {
+  const roomImage = useMemo(() => {
+    const hour = new Date().getHours();
+    return hour >= 20 || hour < 6 ? nightRoomImage : dayRoomImage;
+  }, []);
   const source = Asset.fromModule(roomImage);
 
   return (

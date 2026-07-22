@@ -1,13 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
+  BackHandler,
   Easing,
   Platform,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,24 +18,33 @@ import { StudyScene } from '@/features/study/StudyScene';
 import {
   DEVELOPMENT_SECONDS_PER_PAGE,
   formatCountdown,
-  formatElapsedTime,
   getSecondsUntilNextPage,
   PRODUCTION_SECONDS_PER_PAGE,
   studyCategories,
 } from '@/features/study/studySession';
 import { useStudySession } from '@/features/study/useStudySession';
 
+const studyDurationOptions = [10, 25, 50] as const;
+
 export function StudyDeskScreen() {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState(studyCategories[0]);
+  const [studySubject, setStudySubject] = useState('');
+  const [selectedDurationMinutes, setSelectedDurationMinutes] = useState(25);
   const [isStarted, setIsStarted] = useState(false);
   const [isAccelerated, setIsAccelerated] = useState(__DEV__);
   const [isCompleting, setIsCompleting] = useState(false);
   const panelEntrance = useRef(new Animated.Value(0)).current;
   const completionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasSavedResult = useRef(false);
   const secondsPerPage = isAccelerated
     ? DEVELOPMENT_SECONDS_PER_PAGE
     : PRODUCTION_SECONDS_PER_PAGE;
+  const targetDurationSeconds = selectedDurationMinutes * 60;
+  const activeCategory = useMemo(() => ({
+    ...selectedCategory,
+    label: studySubject.trim() || selectedCategory.label,
+  }), [selectedCategory, studySubject]);
   const {
     state,
     configure,
@@ -40,7 +52,7 @@ export function StudyDeskScreen() {
     pause,
     resume,
     finish,
-  } = useStudySession(selectedCategory, secondsPerPage);
+  } = useStudySession(activeCategory, secondsPerPage, targetDurationSeconds);
 
   useEffect(() => {
     const animation = Animated.spring(panelEntrance, {
@@ -54,15 +66,45 @@ export function StudyDeskScreen() {
   }, [panelEntrance]);
 
   useEffect(() => {
-    if (!isStarted) configure(selectedCategory, secondsPerPage);
-  }, [configure, isStarted, secondsPerPage, selectedCategory]);
+    if (!isStarted) configure(activeCategory, secondsPerPage, targetDurationSeconds);
+  }, [activeCategory, configure, isStarted, secondsPerPage, targetDurationSeconds]);
 
   useEffect(() => () => {
     if (completionTimer.current) clearTimeout(completionTimer.current);
   }, []);
 
+  const saveAndOpenBookshelf = useCallback(() => {
+    if (hasSavedResult.current) return;
+
+    hasSavedResult.current = true;
+    const result = finish();
+    setIsCompleting(true);
+    completionTimer.current = setTimeout(() => {
+      router.replace({
+        pathname: '/bookshelf',
+        params: {
+          startedAt: result.startedAt,
+          endedAt: result.endedAt,
+          elapsedSeconds: result.elapsedSeconds.toString(),
+          targetDurationSeconds: result.targetDurationSeconds.toString(),
+          categoryId: result.category.id,
+          categoryLabel: result.category.label,
+          completedPages: result.completedPages.toString(),
+          currentPageProgress: result.currentPageProgress.toFixed(4),
+        },
+      });
+    }, 760);
+  }, [finish, router]);
+
+  useEffect(() => {
+    if (!isStarted || isCompleting || state.remainingSeconds > 0) return;
+    saveAndOpenBookshelf();
+  }, [isCompleting, isStarted, saveAndOpenBookshelf, state.remainingSeconds]);
+
   const handleStart = () => {
-    configure(selectedCategory, secondsPerPage);
+    configure(activeCategory, secondsPerPage, targetDurationSeconds);
+    hasSavedResult.current = false;
+    setIsCompleting(false);
     setIsStarted(true);
     start();
   };
@@ -73,30 +115,57 @@ export function StudyDeskScreen() {
   };
 
   const handleFinish = () => {
-    if (isCompleting) return;
-
-    const result = finish();
-    setIsCompleting(true);
-    completionTimer.current = setTimeout(() => {
-      router.replace({
-        pathname: '/(tabs)/study',
-        params: {
-          startedAt: result.startedAt,
-          endedAt: result.endedAt,
-          elapsedSeconds: result.elapsedSeconds.toString(),
-          categoryId: result.category.id,
-          categoryLabel: result.category.label,
-          completedPages: result.completedPages.toString(),
-          currentPageProgress: result.currentPageProgress.toFixed(4),
-        },
-      });
-    }, 760);
+    saveAndOpenBookshelf();
   };
 
-  const handleBack = () => {
+  const leaveStudyDesk = useCallback(() => {
     if (state.isRunning) pause();
     router.back();
-  };
+  }, [pause, router, state.isRunning]);
+
+  const handleBack = useCallback(() => {
+    if (!isStarted || isCompleting || hasSavedResult.current) {
+      router.back();
+      return;
+    }
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      if (window.confirm('진행 중인 공부를 종료하고 나갈까요?')) leaveStudyDesk();
+      return;
+    }
+
+    Alert.alert(
+      '공부를 종료할까요?',
+      '나가면 현재 타이머가 멈추고 기록 화면으로 이동하지 않습니다.',
+      [
+        { text: '계속 공부하기', style: 'cancel' },
+        { text: '나가기', style: 'destructive', onPress: leaveStudyDesk },
+      ],
+    );
+  }, [isCompleting, isStarted, leaveStudyDesk, router]);
+
+  useEffect(() => {
+    if (!isStarted || isCompleting) return undefined;
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleBack();
+      return true;
+    });
+
+    return () => subscription.remove();
+  }, [handleBack, isCompleting, isStarted]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !isStarted || isCompleting) return undefined;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isCompleting, isStarted]);
 
   return (
     <View style={styles.container}>
@@ -122,13 +191,13 @@ export function StudyDeskScreen() {
               </Pressable>
 
               <View style={styles.timerPill}>
-                <View style={[styles.categoryDot, { backgroundColor: selectedCategory.color }]} />
+                <View style={[styles.categoryDot, { backgroundColor: activeCategory.color }]} />
                 <View>
                   <Text style={styles.timerCategory}>
-                    {state.isPaused ? '잠시 멈춤' : selectedCategory.label}
+                    {state.isPaused ? '잠시 멈춤' : activeCategory.label}
                   </Text>
                   <Text accessibilityLiveRegion="polite" style={styles.timerText}>
-                    {formatElapsedTime(state.elapsedMs)}
+                    {formatCountdown(state.remainingSeconds)}
                   </Text>
                 </View>
               </View>
@@ -157,7 +226,7 @@ export function StudyDeskScreen() {
               <View style={styles.pageStatus}>
                 <Text style={styles.pageCount}>필사한 페이지 {state.completedPages}장</Text>
                 <Text style={styles.nextPage}>
-                  다음 페이지까지 {formatCountdown(getSecondsUntilNextPage(state))}
+                  남은 시간 {formatCountdown(state.remainingSeconds)} · 다음 페이지까지 {formatCountdown(getSecondsUntilNextPage(state))}
                 </Text>
               </View>
               {__DEV__ ? (
@@ -215,9 +284,54 @@ export function StudyDeskScreen() {
               <View style={styles.panelHeading}>
                 <View>
                   <Text style={styles.panelEyebrow}>ACTIVITY</Text>
-                  <Text style={styles.panelTitle}>활동 주제 선택</Text>
+                  <Text style={styles.panelTitle}>공부 준비</Text>
                 </View>
-                <Text style={styles.pageReward}>10분마다 1페이지</Text>
+                <Text style={styles.pageReward}>남은 시간 MM:SS</Text>
+              </View>
+
+              <View style={styles.subjectBlock}>
+                <Text style={styles.fieldLabel}>공부 주제</Text>
+                <TextInput
+                  accessibilityLabel="공부 주제 입력"
+                  autoCorrect={false}
+                  maxLength={24}
+                  onChangeText={setStudySubject}
+                  placeholder="예: 알고리즘 복습"
+                  placeholderTextColor="#AA9B89"
+                  returnKeyType="done"
+                  style={styles.subjectInput}
+                  value={studySubject}
+                />
+              </View>
+
+              <View style={styles.timeBlock}>
+                <Text style={styles.fieldLabel}>목표 시간</Text>
+                <View style={styles.timeOptions}>
+                  {studyDurationOptions.map((minutes) => {
+                    const selected = minutes === selectedDurationMinutes;
+                    return (
+                      <Pressable
+                        key={minutes}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        onPress={() => setSelectedDurationMinutes(minutes)}
+                        style={({ pressed }) => [
+                          styles.timeOption,
+                          selected && styles.timeOptionSelected,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Text style={[
+                          styles.timeOptionText,
+                          selected && styles.timeOptionTextSelected,
+                        ]}
+                        >
+                          {minutes}분
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
 
               <View style={styles.categoryGrid}>
@@ -268,7 +382,7 @@ export function StudyDeskScreen() {
                   pressed && styles.pressed,
                 ]}
               >
-                <Text style={styles.startLabel}>필사 시작</Text>
+                <Text style={styles.startLabel}>공부 시작</Text>
                 <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
               </Pressable>
             </Animated.View>
@@ -360,6 +474,55 @@ const styles = StyleSheet.create({
     color: '#7E705F',
     fontSize: 10,
     fontWeight: '700',
+  },
+  subjectBlock: {
+    marginBottom: 11,
+  },
+  fieldLabel: {
+    marginBottom: 6,
+    color: '#736553',
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  subjectInput: {
+    minHeight: 43,
+    paddingHorizontal: 13,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E0D4C4',
+    backgroundColor: '#FFFEFA',
+    color: '#4C4137',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  timeBlock: {
+    marginBottom: 13,
+  },
+  timeOptions: {
+    flexDirection: 'row',
+    gap: 7,
+  },
+  timeOption: {
+    flex: 1,
+    minHeight: 38,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: '#E0D4C4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFEFA',
+  },
+  timeOptionSelected: {
+    borderColor: '#75614A',
+    backgroundColor: '#75614A',
+  },
+  timeOptionText: {
+    color: '#67594B',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  timeOptionTextSelected: {
+    color: '#FFF9EE',
   },
   categoryGrid: {
     flexDirection: 'row',

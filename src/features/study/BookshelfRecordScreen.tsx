@@ -1,16 +1,93 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
+  createStudyBookFromResult,
   formatStudyTime,
-  getBookCount,
-  studyCategories,
+  getStudyCategory,
+  useStudyBooks,
 } from '@/features/home/studyBooks';
+
+type BookshelfParams = {
+  endedAt?: string;
+  elapsedSeconds?: string;
+  categoryId?: string;
+  categoryLabel?: string;
+  completedPages?: string;
+};
 
 export function BookshelfRecordScreen() {
   const router = useRouter();
-  const totalMinutes = studyCategories.reduce((total, category) => total + category.minutes, 0);
+  const params = useLocalSearchParams<BookshelfParams>();
+  const {
+    categorySummaries,
+    totalMinutes,
+    addBookOnce,
+  } = useStudyBooks();
+  const [isPlacing, setIsPlacing] = useState(false);
+  const [placedBookId, setPlacedBookId] = useState<string | null>(null);
+  const hasPlacedRef = useRef(false);
+  const settle = useRef(new Animated.Value(0)).current;
+  const placeProgress = useRef(new Animated.Value(0)).current;
+  const newBook = useMemo(() => createStudyBookFromResult(params), [params]);
+  const newBookCategory = newBook ? getStudyCategory(newBook.categoryId) : null;
+  const showNewBook = newBook !== null && placedBookId !== newBook.id;
+  const totalBookCount = categorySummaries.reduce(
+    (total, category) => total + category.books.length,
+    0,
+  );
+  const showEmptyPrompt = totalBookCount === 0 && !showNewBook;
+
+  useEffect(() => {
+    const animation = Animated.sequence([
+      Animated.timing(settle, {
+        toValue: 1,
+        duration: 220,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.spring(settle, {
+        toValue: 0,
+        damping: 13,
+        stiffness: 120,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [settle]);
+
+  const handlePlaceBook = async () => {
+    if (!newBook || hasPlacedRef.current) return;
+
+    hasPlacedRef.current = true;
+    setIsPlacing(true);
+    placeProgress.setValue(0);
+
+    try {
+      await addBookOnce(newBook);
+    } catch {
+      setIsPlacing(false);
+      hasPlacedRef.current = false;
+      return;
+    }
+
+    Animated.timing(placeProgress, {
+      toValue: 1,
+      duration: 680,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: Platform.OS !== 'web',
+    }).start(({ finished }) => {
+      setIsPlacing(false);
+      if (finished) {
+        setPlacedBookId(newBook.id ?? null);
+        return;
+      }
+      hasPlacedRef.current = false;
+    });
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -30,14 +107,108 @@ export function BookshelfRecordScreen() {
           </View>
         </View>
 
+        {showNewBook && newBook ? (
+          <View style={styles.newBookCard}>
+            <View style={styles.newBookCopy}>
+              <Text style={styles.newBookEyebrow}>NEW BOOK</Text>
+              <Text style={styles.newBookTitle}>{newBook.title}</Text>
+              <Text style={styles.newBookMeta}>
+                {newBookCategory?.label} · {formatStudyTime(newBook.minutes)}
+              </Text>
+            </View>
+            <Animated.View
+              style={[
+                styles.newBookPreview,
+                {
+                  backgroundColor: newBookCategory?.color ?? '#6288A8',
+                  transform: [
+                    {
+                      translateY: placeProgress.interpolate({
+                        inputRange: [0, 0.45, 1],
+                        outputRange: [0, -22, 92],
+                      }),
+                    },
+                    {
+                      translateX: placeProgress.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, -76],
+                      }),
+                    },
+                    {
+                      scale: placeProgress.interpolate({
+                        inputRange: [0, 0.65, 1],
+                        outputRange: [1, 0.82, 0.45],
+                      }),
+                    },
+                  ],
+                  opacity: placeProgress.interpolate({
+                    inputRange: [0, 0.95, 1],
+                    outputRange: [1, 1, 0],
+                  }),
+                },
+              ]}
+            >
+              <View style={styles.bookRule} />
+              <Text numberOfLines={1} style={styles.newBookSpineText}>{newBook.title}</Text>
+            </Animated.View>
+            <Pressable
+              accessibilityRole="button"
+              disabled={isPlacing}
+              onPress={() => void handlePlaceBook()}
+              style={({ pressed }) => [
+                styles.placeButton,
+                isPlacing && styles.disabled,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.placeButtonText}>{isPlacing ? '꽂는 중' : '책장에 꽂기'}</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         <View style={styles.totalCard}>
           <Text style={styles.totalLabel}>누적 공부 시간</Text>
           <Text style={styles.totalValue}>{formatStudyTime(totalMinutes)}</Text>
-          <Text style={styles.totalHint}>책의 색은 주제, 두께는 공부 시간을 나타내요.</Text>
+          <Text style={styles.totalHint}>책의 색은 주제, 두께와 높이는 공부 시간이 쌓인 정도를 보여줘요.</Text>
         </View>
 
-        <View style={styles.shelfCase}>
-          {studyCategories.map((category) => (
+        {showEmptyPrompt ? (
+          <View style={styles.emptyPrompt}>
+            <View style={styles.emptyIcon}>
+              <Ionicons name="book-outline" size={24} color="#7B6B59" />
+            </View>
+            <View style={styles.emptyCopy}>
+              <Text style={styles.emptyTitle}>아직 꽂힌 책이 없어요</Text>
+              <Text style={styles.emptyText}>
+                공부를 완료하면 새 책이 만들어지고, 이 책장에 차곡차곡 쌓여요.
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="공부하러 책상으로 이동"
+              onPress={() => router.push('/study-desk')}
+              style={({ pressed }) => [styles.studyButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.studyButtonText}>공부해서 새 책 만들기</Text>
+              <Ionicons name="arrow-forward" size={16} color="#FFF9EF" />
+            </Pressable>
+          </View>
+        ) : null}
+
+        <Animated.View
+          style={[
+            styles.shelfCase,
+            {
+              transform: [{
+                scale: settle.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 1.025],
+                }),
+              }],
+            },
+          ]}
+        >
+          {categorySummaries.map((category) => (
             <View key={category.id} style={styles.shelfSection}>
               <View style={styles.shelfLabelRow}>
                 <View style={[styles.legendDot, { backgroundColor: category.color }]} />
@@ -45,32 +216,32 @@ export function BookshelfRecordScreen() {
                 <Text style={styles.categoryTime}>{formatStudyTime(category.minutes)}</Text>
               </View>
               <View style={styles.bookRow}>
-                {Array.from({ length: getBookCount(category.minutes) }).map((_, index) => (
+                {category.books.map((book, index) => (
                   <View
-                    key={`${category.id}-${index}`}
+                    key={book.id}
                     style={[
                       styles.book,
                       {
-                        width: 21 + ((category.minutes + index * 11) % 13),
-                        height: 72 + (index % 3) * 10,
+                        width: 20 + ((book.minutes + index * 11) % 11),
+                        height: 70 + Math.min(24, book.minutes / 5) + (index % 3) * 5,
                         backgroundColor: index % 2 === 0 ? category.color : category.colorDark,
                       },
                     ]}
                   >
                     <View style={styles.bookRule} />
-                    <Text numberOfLines={1} style={styles.bookText}>{category.label}</Text>
+                    <Text numberOfLines={1} style={styles.bookText}>{book.title}</Text>
                   </View>
                 ))}
               </View>
               <View style={styles.woodShelf} />
             </View>
           ))}
-        </View>
+        </Animated.View>
 
         <View style={styles.insight}>
           <Ionicons name="sparkles-outline" size={18} color="#7C7753" />
           <Text style={styles.insightText}>
-            가장 많이 쌓인 책은 코딩이에요. 이번 주에도 파란 책 한 권을 더 채워볼까요?
+            최근 공부가 쌓이면 홈 방 책장과 이 상세 책장에 같은 책으로 반영돼요.
           </Text>
         </View>
       </ScrollView>
@@ -96,6 +267,52 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1 },
   eyebrow: { color: '#94806B', fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
   title: { marginTop: 3, color: '#392F27', fontSize: 21, fontWeight: '900' },
+  newBookCard: {
+    marginTop: 22,
+    minHeight: 142,
+    padding: 18,
+    borderRadius: 22,
+    overflow: 'hidden',
+    backgroundColor: '#FFF9EF',
+    borderWidth: 1,
+    borderColor: '#E8DDCD',
+  },
+  newBookCopy: { paddingRight: 116 },
+  newBookEyebrow: { color: '#9A7A57', fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
+  newBookTitle: { marginTop: 5, color: '#392F27', fontSize: 22, fontWeight: '900' },
+  newBookMeta: { marginTop: 6, color: '#8C7967', fontSize: 12, fontWeight: '700' },
+  newBookPreview: {
+    position: 'absolute',
+    top: 21,
+    right: 34,
+    width: 42,
+    height: 92,
+    borderTopLeftRadius: 5,
+    borderTopRightRadius: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(48, 37, 29, 0.28)',
+    alignItems: 'center',
+  },
+  newBookSpineText: {
+    marginTop: 'auto',
+    marginBottom: 10,
+    width: 78,
+    color: 'rgba(255, 249, 235, 0.88)',
+    fontSize: 9,
+    fontWeight: '900',
+    transform: [{ rotate: '-90deg' }],
+  },
+  placeButton: {
+    alignSelf: 'flex-start',
+    minHeight: 40,
+    marginTop: 18,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#655646',
+  },
+  placeButtonText: { color: '#FFF9EF', fontSize: 12, fontWeight: '900' },
   totalCard: {
     marginTop: 22,
     padding: 20,
@@ -107,6 +324,53 @@ const styles = StyleSheet.create({
   totalLabel: { color: '#8C7967', fontSize: 12, fontWeight: '700' },
   totalValue: { marginTop: 5, color: '#3D332A', fontSize: 29, fontWeight: '900' },
   totalHint: { marginTop: 7, color: '#8D8174', fontSize: 11, lineHeight: 17 },
+  emptyPrompt: {
+    marginTop: 16,
+    padding: 18,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#E8DDCD',
+    backgroundColor: '#FFF9EF',
+  },
+  emptyIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EFE3CF',
+  },
+  emptyCopy: {
+    marginTop: 13,
+  },
+  emptyTitle: {
+    color: '#392F27',
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  emptyText: {
+    marginTop: 7,
+    color: '#8D8174',
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
+  studyButton: {
+    minHeight: 44,
+    marginTop: 16,
+    paddingHorizontal: 16,
+    borderRadius: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    backgroundColor: '#655646',
+  },
+  studyButtonText: {
+    color: '#FFF9EF',
+    fontSize: 12,
+    fontWeight: '900',
+  },
   shelfCase: {
     marginTop: 20,
     paddingHorizontal: 16,
@@ -133,6 +397,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: 4,
+    overflow: 'hidden',
     backgroundColor: '#6C4D36',
     borderTopLeftRadius: 4,
     borderTopRightRadius: 4,
@@ -146,7 +411,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(48, 37, 29, 0.28)',
   },
-  bookRule: { width: '78%', height: 2, backgroundColor: 'rgba(255, 241, 217, 0.55)' },
+  bookRule: { width: '78%', height: 2, marginTop: 7, backgroundColor: 'rgba(255, 241, 217, 0.55)' },
   bookText: {
     marginTop: 'auto',
     color: 'rgba(255, 249, 235, 0.82)',
@@ -172,4 +437,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#EBE7D4',
   },
   insightText: { flex: 1, color: '#646047', fontSize: 12, lineHeight: 19, fontWeight: '600' },
+  disabled: { opacity: 0.62 },
 });

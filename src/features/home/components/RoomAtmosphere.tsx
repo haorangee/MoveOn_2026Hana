@@ -9,10 +9,10 @@ type RoomAtmosphereProps = {
 };
 
 const phaseColors: Record<DayPhase, string> = {
-  morning: 'rgba(255, 222, 154, 0.08)',
-  afternoon: 'rgba(255, 244, 213, 0.025)',
-  evening: 'rgba(221, 125, 74, 0.18)',
-  night: 'rgba(34, 48, 74, 0.42)',
+  morning: 'rgba(255, 226, 168, 0.06)',
+  afternoon: 'rgba(255, 248, 226, 0.045)',
+  evening: 'rgba(238, 157, 96, 0.1)',
+  night: 'rgba(255, 221, 156, 0.055)',
 };
 
 function getDayPhase(hour: number): DayPhase {
@@ -38,7 +38,6 @@ export function getNextWeather(weather: RoomWeather): RoomWeather {
 
 export function RoomAtmosphere({ weather }: RoomAtmosphereProps) {
   const curtain = useRef(new Animated.Value(0)).current;
-  const sunlight = useRef(new Animated.Value(0)).current;
   const leaves = useRef(new Animated.Value(0)).current;
   const precipitation = useRef(new Animated.Value(0)).current;
   const phase = useMemo(() => getDayPhase(new Date().getHours()), []);
@@ -54,20 +53,6 @@ export function RoomAtmosphere({ weather }: RoomAtmosphereProps) {
         Animated.timing(curtain, {
           toValue: 0,
           duration: 5200,
-          useNativeDriver: Platform.OS !== 'web',
-        }),
-      ]),
-    );
-    const sunlightAnimation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(sunlight, {
-          toValue: 1,
-          duration: 11000,
-          useNativeDriver: Platform.OS !== 'web',
-        }),
-        Animated.timing(sunlight, {
-          toValue: 0,
-          duration: 11000,
           useNativeDriver: Platform.OS !== 'web',
         }),
       ]),
@@ -95,18 +80,16 @@ export function RoomAtmosphere({ weather }: RoomAtmosphereProps) {
     );
 
     curtainAnimation.start();
-    sunlightAnimation.start();
     leafAnimation.start();
     precipitation.setValue(0);
     if (weather !== 'clear') weatherAnimation.start();
 
     return () => {
       curtainAnimation.stop();
-      sunlightAnimation.stop();
       leafAnimation.stop();
       weatherAnimation.stop();
     };
-  }, [curtain, leaves, precipitation, sunlight, weather]);
+  }, [curtain, leaves, precipitation, weather]);
 
   const curtainTransform = {
     transform: [
@@ -127,27 +110,6 @@ export function RoomAtmosphere({ weather }: RoomAtmosphereProps) {
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <Animated.View
-        style={[
-          styles.sunBeam,
-          {
-            opacity: sunlight.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.12, 0.25],
-            }),
-            transform: [
-              { rotate: '10deg' },
-              {
-                translateX: sunlight.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [-8, 12],
-                }),
-              },
-            ],
-          },
-        ]}
-      />
-
       <View
         style={[
           styles.windowWeather,
@@ -265,21 +227,11 @@ export function RoomAtmosphere({ weather }: RoomAtmosphereProps) {
       </Animated.View>
 
       <View style={[StyleSheet.absoluteFill, { backgroundColor: phaseColors[phase] }]} />
-      {phase === 'night' ? <View style={styles.lampGlow} /> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  sunBeam: {
-    position: 'absolute',
-    left: '19%',
-    top: '31%',
-    width: '45%',
-    height: '58%',
-    borderRadius: 180,
-    backgroundColor: 'rgba(255, 227, 162, 0.34)',
-  },
   windowWeather: {
     position: 'absolute',
     left: '19%',
@@ -341,13 +293,4 @@ const styles = StyleSheet.create({
   leafOne: { left: 5, top: 28, transform: [{ rotate: '-32deg' }] },
   leafTwo: { left: 30, top: 8, transform: [{ rotate: '28deg' }] },
   leafThree: { left: 42, top: 38, transform: [{ rotate: '-12deg' }] },
-  lampGlow: {
-    position: 'absolute',
-    left: '38%',
-    top: '31%',
-    width: '30%',
-    height: '28%',
-    borderRadius: 140,
-    backgroundColor: 'rgba(255, 198, 105, 0.17)',
-  },
 });

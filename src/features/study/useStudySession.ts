@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import {
   createStudySessionState,
+  DEFAULT_STUDY_DURATION_SECONDS,
   finishStudySession,
   pauseStudySession,
   refreshStudySession,
@@ -12,9 +13,13 @@ import {
   type StudySessionState,
 } from '@/features/study/studySession';
 
-export function useStudySession(initialCategory: StudyCategory, secondsPerPage: number) {
+export function useStudySession(
+  initialCategory: StudyCategory,
+  secondsPerPage: number,
+  targetDurationSeconds = DEFAULT_STUDY_DURATION_SECONDS,
+) {
   const [state, setState] = useState<StudySessionState>(() => (
-    createStudySessionState(initialCategory, secondsPerPage)
+    createStudySessionState(initialCategory, secondsPerPage, targetDurationSeconds)
   ));
   const stateRef = useRef(state);
   const mountedRef = useRef(true);
@@ -54,9 +59,13 @@ export function useStudySession(initialCategory: StudyCategory, secondsPerPage: 
     return () => subscription.remove();
   }, [refresh]);
 
-  const configure = useCallback((category: StudyCategory, pageSeconds: number) => {
+  const configure = useCallback((
+    category: StudyCategory,
+    pageSeconds: number,
+    durationSeconds: number,
+  ) => {
     if (stateRef.current.isRunning || stateRef.current.isPaused) return;
-    commit(createStudySessionState(category, pageSeconds));
+    commit(createStudySessionState(category, pageSeconds, durationSeconds));
   }, [commit]);
 
   const start = useCallback(() => {

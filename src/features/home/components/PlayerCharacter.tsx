@@ -30,6 +30,7 @@ export function PlayerCharacter({ activity, isInteracting, sceneSize }: PlayerCh
   const x = useRef(new Animated.Value(0)).current;
   const y = useRef(new Animated.Value(0)).current;
   const step = useRef(new Animated.Value(0)).current;
+  const idleBreath = useRef(new Animated.Value(0)).current;
   const [facing, setFacing] = useState<1 | -1>(1);
   const [isWalking, setIsWalking] = useState(false);
   const previousTarget = useRef(initialAnchor.x);
@@ -47,13 +48,13 @@ export function PlayerCharacter({ activity, isInteracting, sceneSize }: PlayerCh
       Animated.sequence([
         Animated.timing(step, {
           toValue: 1,
-          duration: isWalking ? 360 : 1850,
+          duration: isWalking ? 560 : 1850,
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(step, {
           toValue: 0,
-          duration: isWalking ? 360 : 1850,
+          duration: isWalking ? 560 : 1850,
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: Platform.OS !== 'web',
         }),
@@ -62,6 +63,27 @@ export function PlayerCharacter({ activity, isInteracting, sceneSize }: PlayerCh
     animation.start();
     return () => animation.stop();
   }, [isWalking, step]);
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(idleBreath, {
+          toValue: 1,
+          duration: 2100,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        Animated.timing(idleBreath, {
+          toValue: 0,
+          duration: 2100,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [idleBreath]);
 
   useEffect(() => {
     if (sceneSize.width === 0 || sceneSize.height === 0) return;
@@ -114,29 +136,90 @@ export function PlayerCharacter({ activity, isInteracting, sceneSize }: PlayerCh
           transform: [
             { translateX: x },
             { translateY: y },
-            { scaleX: facing },
-            {
-              translateY: step.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, isWalking ? -5 : -2],
-              }),
-            },
-            {
-              rotate: step.interpolate({
-                inputRange: [0, 1],
-                outputRange: [isWalking ? '-1.3deg' : '-0.2deg', isWalking ? '1.3deg' : '0.2deg'],
-              }),
-            },
           ],
         },
       ]}
     >
-      <Image
-        accessibilityLabel={`선택한 캐릭터 ${character.name}`}
-        contentFit="contain"
-        source={character.image}
-        style={StyleSheet.absoluteFill}
+      <Animated.View
+        style={[
+          styles.groundShadow,
+          {
+            opacity: step.interpolate({
+              inputRange: [0, 0.5, 1],
+              outputRange: isWalking ? [0.18, 0.1, 0.18] : [0.14, 0.11, 0.14],
+            }),
+            transform: [
+              {
+                translateX: step.interpolate({
+                  inputRange: [0, 0.5, 1],
+                  outputRange: isWalking ? [0.7, -0.7, 0.7] : [0, 0, 0],
+                }),
+              },
+              {
+                scaleX: step.interpolate({
+                  inputRange: [0, 0.5, 1],
+                  outputRange: isWalking ? [1.01, 0.985, 1.01] : [1, 0.94, 1],
+                }),
+              },
+              {
+                scaleY: step.interpolate({
+                  inputRange: [0, 0.5, 1],
+                  outputRange: isWalking ? [1, 0.9, 1] : [1, 0.9, 1],
+                }),
+              },
+            ],
+          },
+        ]}
       />
+      <Animated.View
+        style={[
+          styles.characterBody,
+          {
+            transform: [
+              { scaleX: facing },
+              {
+                translateX: step.interpolate({
+                  inputRange: [0, 0.25, 0.5, 0.75, 1],
+                  outputRange: isWalking ? [-0.7, -0.25, 0.7, 0.25, -0.7] : [0, 0.35, 0, -0.35, 0],
+                }),
+              },
+              {
+                translateY: step.interpolate({
+                  inputRange: [0, 0.25, 0.5, 0.75, 1],
+                  outputRange: isWalking ? [0, -1.2, 0, -1, 0] : [0, -1.2, -2, -1.2, 0],
+                }),
+              },
+              {
+                rotate: step.interpolate({
+                  inputRange: [0, 0.25, 0.5, 0.75, 1],
+                  outputRange: isWalking
+                    ? ['-0.45deg', '-0.12deg', '0.45deg', '0.12deg', '-0.45deg']
+                    : ['-0.2deg', '0.08deg', '0.2deg', '0.08deg', '-0.2deg'],
+                }),
+              },
+              {
+                scaleX: step.interpolate({
+                  inputRange: [0, 0.5, 1],
+                  outputRange: isWalking ? [1.004, 0.996, 1.004] : [1, 1, 1],
+                }),
+              },
+              {
+                scaleY: idleBreath.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 1.012],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <Image
+          accessibilityLabel={`선택한 캐릭터 ${character.name}`}
+          contentFit="contain"
+          source={character.image}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
     </Animated.View>
   );
 }
@@ -146,5 +229,17 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     top: 0,
+  },
+  characterBody: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  groundShadow: {
+    position: 'absolute',
+    left: '30%',
+    right: '30%',
+    bottom: '3%',
+    height: '8%',
+    borderRadius: 999,
+    backgroundColor: '#4E3B2D',
   },
 });

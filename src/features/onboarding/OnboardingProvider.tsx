@@ -7,6 +7,10 @@ import {
   useMemo,
   useState,
 } from 'react';
+import {
+  recordFirebaseLogin,
+  saveFirebaseUserProfile,
+} from '@/features/auth/firebaseLoginRecords';
 import type { CharacterId, PetSpecies } from '@/features/onboarding/onboardingData';
 
 const PROFILE_STORAGE_KEY = '@moveon/profile/v1';
@@ -48,9 +52,12 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
           const parsedProfile = JSON.parse(savedProfile) as MoveOnProfile;
           setProfile(parsedProfile);
           setIsOnboarded(true);
+          void recordFirebaseLogin(parsedProfile);
+        } else {
+          void recordFirebaseLogin(null);
         }
       } catch {
-        // 손상된 Mock 데이터는 무시하고 온보딩을 다시 시작합니다.
+        void recordFirebaseLogin(null);
       } finally {
         setIsHydrated(true);
       }
@@ -67,6 +74,7 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
       setProfile(nextProfile);
       setIsOnboarded(true);
       await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(nextProfile));
+      void saveFirebaseUserProfile(nextProfile);
     },
     resetOnboarding: async () => {
       setProfile(initialProfile);

@@ -15,7 +15,7 @@ export function InteractiveRoomObject({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${object.title} 사용하기`}
+      accessibilityLabel={object.id === 'bookshelf' ? '나의 공부 책장 열기' : `${object.title} 사용하기`}
       accessibilityHint={`${object.actionLabel} 기능으로 이동합니다.`}
       disabled={disabled}
       onPress={() => onPress(object)}

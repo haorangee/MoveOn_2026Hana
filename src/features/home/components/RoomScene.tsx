@@ -8,10 +8,9 @@ import {
   Text,
   View,
 } from 'react-native';
+import { CharacterCompanionGroup } from '@/features/home/components/CharacterCompanionGroup';
 import { InteractiveRoomObject } from '@/features/home/components/InteractiveRoomObject';
 import { NewspaperProp } from '@/features/home/components/NewspaperProp';
-import { PlayerCharacter } from '@/features/home/components/PlayerCharacter';
-import { PlayerPet } from '@/features/home/components/PlayerPet';
 import { QuestMemoBoard } from '@/features/home/components/QuestMemoBoard';
 import {
   getInitialMockWeather,
@@ -37,12 +36,6 @@ const idleActivities: RoomActivity[] = [
   'walking',
 ];
 
-const maruMessages = [
-  '오늘은 어디부터 가볼까?',
-  '네가 움직이면 나도 따라갈게!',
-  '햇살이 따뜻해서 기분이 좋아.',
-];
-
 type RoomSceneProps = {
   focusedObject: RoomHotspot | null;
   systemMessage?: string | null;
@@ -63,12 +56,10 @@ export function RoomScene({
   const [activity, setActivity] = useState<RoomActivity>(initialActivity);
   const [sceneSize, setSceneSize] = useState({ width: 0, height: 0 });
   const [weather, setWeather] = useState<RoomWeather>(() => getInitialMockWeather());
-  const [showMaruMessage, setShowMaruMessage] = useState(false);
-  const [messageIndex, setMessageIndex] = useState(0);
   const cameraScale = useRef(new Animated.Value(1)).current;
   const cameraX = useRef(new Animated.Value(0)).current;
   const cameraY = useRef(new Animated.Value(0)).current;
-  const focusShade = useRef(new Animated.Value(0)).current;
+  const bookshelfOpenProgress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (focusedObject) {
@@ -116,32 +107,43 @@ export function RoomScene({
         easing: Easing.inOut(Easing.cubic),
         useNativeDriver: Platform.OS !== 'web',
       }),
-      Animated.timing(focusShade, {
-        toValue: focusedObject ? 1 : 0,
-        duration: 520,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
     ]);
     cameraAnimation.start();
 
     return () => cameraAnimation.stop();
-  }, [cameraScale, cameraX, cameraY, focusShade, focusedObject, sceneSize.height, sceneSize.width]);
+  }, [cameraScale, cameraX, cameraY, focusedObject, sceneSize.height, sceneSize.width]);
 
   useEffect(() => {
-    const firstMessage = setTimeout(() => setShowMaruMessage(true), 3000);
-    const hideFirstMessage = setTimeout(() => setShowMaruMessage(false), 5700);
-    const messageCycle = setInterval(() => {
-      setMessageIndex((current) => (current + 1) % maruMessages.length);
-      setShowMaruMessage(true);
-      setTimeout(() => setShowMaruMessage(false), 2600);
-    }, 14000);
+    if (focusedObject?.id !== 'bookshelf') {
+      bookshelfOpenProgress.stopAnimation();
+      bookshelfOpenProgress.setValue(0);
+      return;
+    }
 
-    return () => {
-      clearTimeout(firstMessage);
-      clearTimeout(hideFirstMessage);
-      clearInterval(messageCycle);
-    };
-  }, []);
+    const bookshelfAnimation = Animated.sequence([
+      Animated.timing(bookshelfOpenProgress, {
+        toValue: 0.16,
+        duration: 130,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(bookshelfOpenProgress, {
+        toValue: 0.52,
+        duration: 310,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(bookshelfOpenProgress, {
+        toValue: 1,
+        duration: 380,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]);
+    bookshelfAnimation.start();
+
+    return () => bookshelfAnimation.stop();
+  }, [bookshelfOpenProgress, focusedObject]);
 
   const handleLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -168,28 +170,18 @@ export function RoomScene({
       >
         <RoomBackdrop />
         <RoomAtmosphere weather={weather} />
-        <StudyBookshelfOverlay />
+        <StudyBookshelfOverlay
+          disabled={focusedObject !== null}
+          onOpen={() => {
+            const bookshelf = roomHotspots.find((object) => object.id === 'bookshelf');
+            if (bookshelf) onObjectPress(bookshelf);
+          }}
+          openingProgress={bookshelfOpenProgress}
+        />
         <QuestMemoBoard />
         <NewspaperProp />
 
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.characterGroundGlow,
-            {
-              opacity: focusShade.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0.13, 0.25],
-              }),
-            },
-          ]}
-        />
-        <PlayerPet
-          activity={activity}
-          isInteracting={focusedObject !== null}
-          sceneSize={sceneSize}
-        />
-        <PlayerCharacter
+        <CharacterCompanionGroup
           activity={activity}
           isInteracting={focusedObject !== null}
           sceneSize={sceneSize}
@@ -203,13 +195,20 @@ export function RoomScene({
             onPress={onObjectPress}
           />
         ))}
-
-        {showMaruMessage && !focusedObject ? (
-          <View pointerEvents="none" style={styles.maruBubble}>
-            <Text style={styles.maruText}>{maruMessages[messageIndex]}</Text>
-          </View>
-        ) : null}
       </Animated.View>
+
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.bookshelfFade,
+          {
+            opacity: bookshelfOpenProgress.interpolate({
+              inputRange: [0, 0.5, 1],
+              outputRange: [0, 0.1, 0.28],
+            }),
+          },
+        ]}
+      />
 
       <TopGameStatus onSettingsPress={onSettingsPress} />
 
@@ -233,32 +232,10 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
   },
-  characterGroundGlow: {
-    position: 'absolute',
-    left: '31%',
-    top: '70%',
-    width: '36%',
-    height: '8%',
-    borderRadius: 90,
-    backgroundColor: 'rgba(255, 231, 171, 0.36)',
+  bookshelfFade: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#211B16',
   },
-  maruBubble: {
-    position: 'absolute',
-    left: '12%',
-    top: '66%',
-    maxWidth: 154,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 15,
-    borderBottomLeftRadius: 4,
-    backgroundColor: 'rgba(255, 252, 245, 0.9)',
-    shadowColor: '#3D3428',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.13,
-    shadowRadius: 7,
-    elevation: 3,
-  },
-  maruText: { color: '#554A3D', fontSize: 10, fontWeight: '700' },
   feedback: {
     position: 'absolute',
     left: 24,
