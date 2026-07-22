@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { RoomScene } from '@/features/home/components/RoomScene';
 import type { RoomHotspot } from '@/features/home/roomData';
 
@@ -33,7 +33,7 @@ export function HomeScreen() {
   };
 
   const handleSettingsPress = () => {
-    router.push('/settings');
+    router.push('/settings' as Href);
   };
 
   return (
