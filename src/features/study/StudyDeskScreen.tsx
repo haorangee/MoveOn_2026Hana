@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useOnboarding } from '@/features/onboarding/OnboardingProvider';
 import { StudyScene } from '@/features/study/StudyScene';
 import {
   DEVELOPMENT_SECONDS_PER_PAGE,
@@ -28,6 +29,7 @@ const studyDurationOptions = [10, 25, 50] as const;
 
 export function StudyDeskScreen() {
   const router = useRouter();
+  const { profile } = useOnboarding();
   const [selectedCategory, setSelectedCategory] = useState(studyCategories[0]);
   const [studySubject, setStudySubject] = useState('');
   const [selectedDurationMinutes, setSelectedDurationMinutes] = useState(25);
@@ -170,6 +172,7 @@ export function StudyDeskScreen() {
   return (
     <View style={styles.container}>
       <StudyScene
+        characterId={profile.characterId}
         completedPages={state.completedPages}
         currentPageProgress={state.currentPageProgress}
         isCompleting={isCompleting}
