@@ -9,6 +9,10 @@ import {
 } from 'react';
 import type { UserProfile } from '@/contracts/user-profile';
 import { useAuth } from '@/features/auth/AuthProvider';
+import {
+  recordFirebaseLogin,
+  saveFirebaseUserProfile,
+} from '@/features/auth/firebaseLoginRecords';
 import { birthDateFromAge, resolveBirthDate } from '@/features/onboarding/birthDate';
 import type { ChapterId } from '@/features/onboarding/domain/onboardingState';
 import type { CharacterId, PetSpecies } from '@/features/onboarding/onboardingData';
@@ -155,6 +159,7 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
 
     async function hydrateProfile() {
       let cachedProfile: MoveOnProfile | null = null;
+      let loginProfile: MoveOnProfile | null = null;
 
       try {
         const savedProfile = await AsyncStorage.getItem(profileStorageKey(currentUserId));
@@ -164,6 +169,7 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
             setProfile(cachedProfile);
             setIsOnboarded(true);
             setIsHydrated(true);
+            loginProfile = cachedProfile;
           }
         }
       } catch {
@@ -181,14 +187,17 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
           const nextProfile = toMoveOnProfile(remoteProfile);
           setProfile(nextProfile);
           setIsOnboarded(true);
+          loginProfile = nextProfile;
           await AsyncStorage.setItem(profileStorageKey(currentUserId), JSON.stringify(nextProfile));
         } else if (cachedProfile) {
           await saveUserProfile(currentUserId, toUserProfile(cachedProfile));
+          loginProfile = cachedProfile;
         } else {
           setProfile(initialProfile);
           setIsOnboarded(false);
         }
 
+        void recordFirebaseLogin(loginProfile).catch(() => undefined);
         if (active) setSyncStatus('synced');
       } catch {
         if (active) setSyncStatus('offline');
@@ -222,6 +231,7 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
         setUserId(user.uid);
         await AsyncStorage.setItem(profileStorageKey(user.uid), JSON.stringify(nextProfile));
         await saveUserProfile(user.uid, toUserProfile(nextProfile));
+        await saveFirebaseUserProfile(nextProfile);
         setSyncStatus('synced');
       } catch {
         setSyncStatus('offline');

@@ -29,7 +29,7 @@ export function HomeScreen() {
       }
 
       actionTimer.current = setTimeout(() => setFocusedObject(null), 2600);
-    }, 1350);
+    }, object.id === 'bookshelf' ? 880 : 1350);
   };
 
   const handleSettingsPress = () => {
