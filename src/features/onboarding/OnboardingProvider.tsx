@@ -8,6 +8,9 @@ import {
   useState,
 } from 'react';
 import type { UserProfile } from '@/contracts/user-profile';
+import { useAuth } from '@/features/auth/AuthProvider';
+import { birthDateFromAge, resolveBirthDate } from '@/features/onboarding/birthDate';
+import type { ChapterId } from '@/features/onboarding/domain/onboardingState';
 import type { CharacterId, PetSpecies } from '@/features/onboarding/onboardingData';
 import {
   deleteUserProfile,
@@ -15,15 +18,22 @@ import {
   loadUserProfile,
   saveUserProfile,
 } from '@/features/onboarding/data/userProfileRepository';
-import { ensureAnonymousUser } from '@/shared/backend/authRepository';
 
 const PROFILE_STORAGE_KEY = '@moveon/profile/v1';
+
+function profileStorageKey(userId: string) {
+  return `${PROFILE_STORAGE_KEY}/${userId}`;
+}
 
 export type MoveOnProfile = {
   name: string;
   age: number;
+  birthDate: string;
   petSpecies: PetSpecies;
+  petName: string;
   characterId: CharacterId;
+  chapter: ChapterId;
+  magazineNotificationEnabled: boolean;
 };
 
 export type ProfileSyncStatus = 'idle' | 'syncing' | 'synced' | 'offline';
@@ -31,17 +41,57 @@ export type ProfileSyncStatus = 'idle' | 'syncing' | 'synced' | 'offline';
 const initialProfile: MoveOnProfile = {
   name: '',
   age: 20,
+  birthDate: birthDateFromAge(20),
   petSpecies: 'dog',
+  petName: '',
   characterId: 'daily',
+  chapter: 'general',
+  magazineNotificationEnabled: false,
 };
+
+const LEGACY_PET_NAME = '마루';
+
+function normalizeCachedProfile(value: unknown): MoveOnProfile | null {
+  if (!value || typeof value !== 'object') return null;
+
+  const profile = value as Partial<MoveOnProfile>;
+  if (
+    typeof profile.name !== 'string'
+    || typeof profile.age !== 'number'
+    || typeof profile.petSpecies !== 'string'
+    || typeof profile.characterId !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    name: profile.name,
+    age: profile.age,
+    birthDate: resolveBirthDate(profile.birthDate, profile.age),
+    petSpecies: profile.petSpecies as PetSpecies,
+    petName: typeof profile.petName === 'string' && profile.petName.trim()
+      ? profile.petName.trim()
+      : LEGACY_PET_NAME,
+    characterId: profile.characterId as CharacterId,
+    chapter: profile.chapter === 'college'
+      || profile.chapter === 'job-seeker'
+      || profile.chapter === 'worker'
+      ? profile.chapter
+      : 'general',
+    magazineNotificationEnabled: profile.magazineNotificationEnabled === true,
+  };
+}
 
 function toUserProfile(profile: MoveOnProfile): UserProfile {
   return {
     nickname: profile.name,
     age: profile.age,
+    birthDate: profile.birthDate,
     petSpecies: profile.petSpecies,
+    petName: profile.petName,
     characterId: profile.characterId,
-    chapter: 'chapter-1',
+    chapter: profile.chapter,
+    magazineNotificationEnabled: profile.magazineNotificationEnabled,
     onboardingCompleted: true,
   };
 }
@@ -50,8 +100,12 @@ function toMoveOnProfile(profile: UserProfile): MoveOnProfile {
   return {
     name: profile.nickname,
     age: profile.age,
+    birthDate: profile.birthDate,
     petSpecies: profile.petSpecies,
+    petName: profile.petName,
     characterId: profile.characterId,
+    chapter: profile.chapter,
+    magazineNotificationEnabled: profile.magazineNotificationEnabled,
   };
 }
 
@@ -68,6 +122,7 @@ type OnboardingContextValue = {
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
 
 export function OnboardingProvider({ children }: PropsWithChildren) {
+  const { isReady: isAuthReady, isRegistered, user } = useAuth();
   const [profile, setProfile] = useState(initialProfile);
   const [userId, setUserId] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<ProfileSyncStatus>('idle');
@@ -77,14 +132,35 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     let active = true;
 
+    if (!isAuthReady) {
+      return () => {
+        active = false;
+      };
+    }
+
+    if (!user || !isRegistered) {
+      setProfile(initialProfile);
+      setUserId(user?.uid ?? null);
+      setSyncStatus('idle');
+      setIsOnboarded(false);
+      setIsHydrated(true);
+      return () => {
+        active = false;
+      };
+    }
+
+    const currentUserId = user.uid;
+    setUserId(currentUserId);
+    setIsHydrated(false);
+
     async function hydrateProfile() {
       let cachedProfile: MoveOnProfile | null = null;
 
       try {
-        const savedProfile = await AsyncStorage.getItem(PROFILE_STORAGE_KEY);
+        const savedProfile = await AsyncStorage.getItem(profileStorageKey(currentUserId));
         if (savedProfile) {
-          cachedProfile = JSON.parse(savedProfile) as MoveOnProfile;
-          if (active) {
+          cachedProfile = normalizeCachedProfile(JSON.parse(savedProfile));
+          if (active && cachedProfile) {
             setProfile(cachedProfile);
             setIsOnboarded(true);
             setIsHydrated(true);
@@ -97,21 +173,20 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
       if (active) setSyncStatus('syncing');
 
       try {
-        const user = await ensureAnonymousUser();
-        if (!active) return;
-        setUserId(user.uid);
-
-        await ensureUserProfileDocument(user.uid);
-        const remoteProfile = await loadUserProfile(user.uid);
+        await ensureUserProfileDocument(currentUserId);
+        const remoteProfile = await loadUserProfile(currentUserId);
         if (!active) return;
 
         if (remoteProfile?.onboardingCompleted) {
           const nextProfile = toMoveOnProfile(remoteProfile);
           setProfile(nextProfile);
           setIsOnboarded(true);
-          await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(nextProfile));
+          await AsyncStorage.setItem(profileStorageKey(currentUserId), JSON.stringify(nextProfile));
         } else if (cachedProfile) {
-          await saveUserProfile(user.uid, toUserProfile(cachedProfile));
+          await saveUserProfile(currentUserId, toUserProfile(cachedProfile));
+        } else {
+          setProfile(initialProfile);
+          setIsOnboarded(false);
         }
 
         if (active) setSyncStatus('synced');
@@ -126,7 +201,7 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [isAuthReady, isRegistered, user]);
 
   const value = useMemo<OnboardingContextValue>(() => ({
     profile,
@@ -138,11 +213,14 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
       setProfile(nextProfile);
       setIsOnboarded(true);
       setSyncStatus('syncing');
-      await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(nextProfile));
 
       try {
-        const user = await ensureAnonymousUser();
+        if (!user || !isRegistered) {
+          throw new Error('A registered Firebase user is required to save onboarding.');
+        }
+
         setUserId(user.uid);
+        await AsyncStorage.setItem(profileStorageKey(user.uid), JSON.stringify(nextProfile));
         await saveUserProfile(user.uid, toUserProfile(nextProfile));
         setSyncStatus('synced');
       } catch {
@@ -153,7 +231,9 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
       const currentUserId = userId;
       setProfile(initialProfile);
       setIsOnboarded(false);
-      await AsyncStorage.removeItem(PROFILE_STORAGE_KEY);
+      if (currentUserId) {
+        await AsyncStorage.removeItem(profileStorageKey(currentUserId));
+      }
 
       if (currentUserId) {
         try {
@@ -165,7 +245,7 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
         }
       }
     },
-  }), [isHydrated, isOnboarded, profile, syncStatus, userId]);
+  }), [isHydrated, isOnboarded, isRegistered, profile, syncStatus, user, userId]);
 
   return (
     <OnboardingContext.Provider value={value}>

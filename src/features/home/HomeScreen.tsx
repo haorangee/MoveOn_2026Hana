@@ -33,9 +33,7 @@ export function HomeScreen() {
   };
 
   const handleSettingsPress = () => {
-    if (messageTimer.current) clearTimeout(messageTimer.current);
-    setSystemMessage('내 방 설정은 다음 업데이트에서 열릴 예정이에요.');
-    messageTimer.current = setTimeout(() => setSystemMessage(null), 2600);
+    router.push('/settings');
   };
 
   return (

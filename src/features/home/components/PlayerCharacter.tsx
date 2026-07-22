@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Platform, StyleSheet } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, View } from 'react-native';
 import { getCharacterOption } from '@/features/onboarding/onboardingData';
 import { useOnboarding } from '@/features/onboarding/OnboardingProvider';
 import type { RoomActivity } from '@/features/home/roomData';
@@ -32,7 +32,7 @@ export function PlayerCharacter({ activity, isInteracting, sceneSize }: PlayerCh
   const step = useRef(new Animated.Value(0)).current;
   const [facing, setFacing] = useState<1 | -1>(1);
   const [isWalking, setIsWalking] = useState(false);
-  const previousTarget = useRef(initialAnchor.x);
+  const previousTarget = useRef(initialAnchor);
 
   const characterSize = useMemo(
     () => ({
@@ -47,13 +47,13 @@ export function PlayerCharacter({ activity, isInteracting, sceneSize }: PlayerCh
       Animated.sequence([
         Animated.timing(step, {
           toValue: 1,
-          duration: isWalking ? 360 : 1850,
+          duration: isWalking ? 260 : 1850,
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(step, {
           toValue: 0,
-          duration: isWalking ? 360 : 1850,
+          duration: isWalking ? 260 : 1850,
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: Platform.OS !== 'web',
         }),
@@ -68,21 +68,30 @@ export function PlayerCharacter({ activity, isInteracting, sceneSize }: PlayerCh
     const anchor = activityAnchors[activity];
     const targetX = anchor.x * sceneSize.width - characterSize.width / 2;
     const targetY = anchor.y * sceneSize.height - characterSize.height;
+    const distance = Math.hypot(
+      (anchor.x - previousTarget.current.x) * sceneSize.width,
+      (anchor.y - previousTarget.current.y) * sceneSize.height,
+    );
+    const walkingDuration = isInteracting
+      ? Math.min(1450, Math.max(850, distance * 8))
+      : Math.min(3300, Math.max(1250, distance * 10));
 
-    setFacing(anchor.x >= previousTarget.current ? 1 : -1);
-    previousTarget.current = anchor.x;
-    setIsWalking(true);
+    setFacing(anchor.x >= previousTarget.current.x ? 1 : -1);
+    previousTarget.current = anchor;
+    setIsWalking(distance > 6);
 
     const movement = Animated.parallel([
       Animated.timing(x, {
         toValue: targetX,
-        duration: isInteracting ? 1150 : 3200,
+        duration: walkingDuration,
+        delay: isInteracting ? 0 : 180,
         easing: Easing.inOut(Easing.cubic),
         useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(y, {
         toValue: targetY,
-        duration: isInteracting ? 1150 : 3200,
+        duration: walkingDuration,
+        delay: isInteracting ? 0 : 180,
         easing: Easing.inOut(Easing.cubic),
         useNativeDriver: Platform.OS !== 'web',
       }),
@@ -118,19 +127,26 @@ export function PlayerCharacter({ activity, isInteracting, sceneSize }: PlayerCh
             {
               translateY: step.interpolate({
                 inputRange: [0, 1],
-                outputRange: [0, isWalking ? -5 : -2],
+                outputRange: [0, isWalking ? -6 : -2],
               }),
             },
             {
               rotate: step.interpolate({
                 inputRange: [0, 1],
-                outputRange: [isWalking ? '-1.3deg' : '-0.2deg', isWalking ? '1.3deg' : '0.2deg'],
+                outputRange: [isWalking ? '-1.7deg' : '-0.2deg', isWalking ? '1.7deg' : '0.2deg'],
+              }),
+            },
+            {
+              scaleY: step.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, isWalking ? 0.985 : 0.995],
               }),
             },
           ],
         },
       ]}
     >
+      <View style={[styles.walkShadow, isWalking && styles.walkShadowActive]} />
       <Image
         accessibilityLabel={`선택한 캐릭터 ${character.name}`}
         contentFit="contain"
@@ -146,5 +162,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     top: 0,
+  },
+  walkShadow: {
+    position: 'absolute',
+    left: '30%',
+    right: '30%',
+    bottom: '8%',
+    height: '5%',
+    borderRadius: 30,
+    backgroundColor: 'rgba(62, 47, 34, 0.13)',
+  },
+  walkShadowActive: {
+    left: '27%',
+    right: '27%',
+    backgroundColor: 'rgba(62, 47, 34, 0.18)',
   },
 });

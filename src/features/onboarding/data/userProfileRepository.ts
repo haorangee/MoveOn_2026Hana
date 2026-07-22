@@ -7,6 +7,7 @@ import {
 } from 'firebase/firestore';
 import { firestore } from '@/config/firebase';
 import type { UserProfile } from '@/contracts/user-profile';
+import { resolveBirthDate } from '@/features/onboarding/birthDate';
 
 function profileDocument(userId: string) {
   return doc(firestore, 'users', userId);
@@ -42,9 +43,18 @@ export async function loadUserProfile(userId: string): Promise<UserProfile | nul
   return {
     nickname: data.nickname,
     age: data.age,
+    birthDate: resolveBirthDate(data.birthDate, data.age),
     petSpecies: data.petSpecies as UserProfile['petSpecies'],
+    petName: typeof data.petName === 'string' && data.petName.trim()
+      ? data.petName.trim()
+      : '마루',
     characterId: data.characterId as UserProfile['characterId'],
-    chapter: typeof data.chapter === 'string' ? data.chapter : 'chapter-1',
+    chapter: data.chapter === 'college'
+      || data.chapter === 'job-seeker'
+      || data.chapter === 'worker'
+      ? data.chapter
+      : 'general',
+    magazineNotificationEnabled: data.magazineNotificationEnabled === true,
     onboardingCompleted: data.onboardingCompleted === true,
   };
 }

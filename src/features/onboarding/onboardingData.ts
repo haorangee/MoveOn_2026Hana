@@ -1,7 +1,7 @@
 import type { ImageSource } from 'expo-image';
 
 export type CharacterId = 'daily' | 'cozy' | 'casual' | 'neat' | 'ropan';
-export type PetSpecies = 'dog' | 'cat' | 'rabbit';
+export type PetSpecies = 'dog' | 'cat' | 'rabbit' | 'hamster';
 
 export type CharacterOption = {
   id: CharacterId;
@@ -68,6 +68,12 @@ export const petOptions: PetOption[] = [
     name: '토끼',
     description: '조용하고 포근한 친구',
     image: require('../../../assets/images/pets/rabbit.png'),
+  },
+  {
+    id: 'hamster',
+    name: '햄스터',
+    description: '작고 부지런한 친구',
+    image: require('../../../assets/images/pets/hamster.png'),
   },
 ];
 

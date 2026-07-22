@@ -23,6 +23,14 @@ const petAnchors: Record<RoomActivity, { x: number; y: number }> = {
   walking: { x: 0.36, y: 0.82 },
 };
 
+const hamsterRoamAnchors = [
+  { x: 0.16, y: 0.82 },
+  { x: 0.36, y: 0.87 },
+  { x: 0.58, y: 0.78 },
+  { x: 0.7, y: 0.82 },
+  { x: 0.43, y: 0.75 },
+] as const;
+
 export function PlayerPet({ activity, isInteracting, sceneSize }: PlayerPetProps) {
   const { profile } = useOnboarding();
   const pet = getPetOption(profile.petSpecies);
@@ -30,15 +38,34 @@ export function PlayerPet({ activity, isInteracting, sceneSize }: PlayerPetProps
   const y = useRef(new Animated.Value(0)).current;
   const reaction = useRef(new Animated.Value(0)).current;
   const [facing, setFacing] = useState<1 | -1>(1);
-  const previousTarget = useRef(petAnchors[activity].x);
+  const [roamIndex, setRoamIndex] = useState(
+    () => Math.floor(Math.random() * hamsterRoamAnchors.length),
+  );
+  const isHamster = pet.id === 'hamster';
+  const resolvedAnchor = useMemo(
+    () => isHamster ? hamsterRoamAnchors[roamIndex] : petAnchors[activity],
+    [activity, isHamster, roamIndex],
+  );
+  const previousTarget = useRef(resolvedAnchor.x);
 
   const petSize = useMemo(
     () => ({
-      width: sceneSize.width * 0.235,
-      height: sceneSize.height * 0.155,
+      width: sceneSize.width * (isHamster ? 0.17 : 0.235),
+      height: sceneSize.height * (isHamster ? 0.11 : 0.155),
     }),
-    [sceneSize.height, sceneSize.width],
+    [isHamster, sceneSize.height, sceneSize.width],
   );
+
+  useEffect(() => {
+    if (!isHamster) return;
+    const roamCycle = setInterval(() => {
+      setRoamIndex((current) => {
+        const step = Math.random() > 0.35 ? 1 : 2;
+        return (current + step) % hamsterRoamAnchors.length;
+      });
+    }, 4600);
+    return () => clearInterval(roamCycle);
+  }, [isHamster]);
 
   useEffect(() => {
     const animation = Animated.loop(
@@ -46,35 +73,35 @@ export function PlayerPet({ activity, isInteracting, sceneSize }: PlayerPetProps
         Animated.delay(1200),
         Animated.timing(reaction, {
           toValue: 1,
-          duration: 260,
+          duration: isHamster ? 170 : 260,
           easing: Easing.out(Easing.quad),
           useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(reaction, {
           toValue: 0,
-          duration: 260,
+          duration: isHamster ? 170 : 260,
           useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(reaction, {
           toValue: 1,
-          duration: 260,
+          duration: isHamster ? 170 : 260,
           useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(reaction, {
           toValue: 0,
-          duration: 320,
+          duration: isHamster ? 220 : 320,
           useNativeDriver: Platform.OS !== 'web',
         }),
-        Animated.delay(2600),
+        Animated.delay(isHamster ? 1600 : 2600),
       ]),
     );
     animation.start();
     return () => animation.stop();
-  }, [reaction]);
+  }, [isHamster, reaction]);
 
   useEffect(() => {
     if (sceneSize.width === 0 || sceneSize.height === 0) return;
-    const anchor = petAnchors[activity];
+    const anchor = resolvedAnchor;
     const targetX = anchor.x * sceneSize.width - petSize.width / 2;
     const targetY = anchor.y * sceneSize.height - petSize.height;
     setFacing(anchor.x >= previousTarget.current ? 1 : -1);
@@ -83,31 +110,33 @@ export function PlayerPet({ activity, isInteracting, sceneSize }: PlayerPetProps
     const movement = Animated.parallel([
       Animated.timing(x, {
         toValue: targetX,
-        duration: isInteracting ? 980 : 2850,
-        delay: 260,
+        duration: isHamster ? 1750 : isInteracting ? 980 : 2850,
+        delay: isHamster ? 80 : 260,
         easing: Easing.inOut(Easing.cubic),
         useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(y, {
         toValue: targetY,
-        duration: isInteracting ? 980 : 2850,
-        delay: 260,
+        duration: isHamster ? 1750 : isInteracting ? 980 : 2850,
+        delay: isHamster ? 80 : 260,
         easing: Easing.inOut(Easing.cubic),
         useNativeDriver: Platform.OS !== 'web',
       }),
     ]);
     movement.start();
     return () => movement.stop();
-  }, [activity, isInteracting, petSize.height, petSize.width, sceneSize.height, sceneSize.width, x, y]);
+  }, [isHamster, isInteracting, petSize.height, petSize.width, resolvedAnchor, sceneSize.height, sceneSize.width, x, y]);
 
   useEffect(() => {
     if (sceneSize.width === 0 || sceneSize.height === 0) return;
-    const anchor = petAnchors[activity];
+    const anchor = resolvedAnchor;
     x.setValue(anchor.x * sceneSize.width - petSize.width / 2);
     y.setValue(anchor.y * sceneSize.height - petSize.height);
     // Initial placement only; subsequent activity changes follow the character.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sceneSize.height, sceneSize.width]);
+    // Initial placement only; later hamster roam changes use the movement animation above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHamster, sceneSize.height, sceneSize.width]);
 
   return (
     <Animated.View
@@ -123,13 +152,13 @@ export function PlayerPet({ activity, isInteracting, sceneSize }: PlayerPetProps
             {
               rotate: reaction.interpolate({
                 inputRange: [0, 1],
-                outputRange: ['-1deg', '3deg'],
+                outputRange: [isHamster ? '-3deg' : '-1deg', isHamster ? '4deg' : '3deg'],
               }),
             },
             {
               translateY: reaction.interpolate({
                 inputRange: [0, 1],
-                outputRange: [0, -3],
+                outputRange: [0, isHamster ? -2 : -3],
               }),
             },
           ],
