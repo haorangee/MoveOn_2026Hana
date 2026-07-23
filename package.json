@@ -8,8 +8,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build": "expo export --platform web",
-    "vercel-build": "expo export --platform web",
+    "build": "expo export --platform web && node scripts/inject-web-metadata.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

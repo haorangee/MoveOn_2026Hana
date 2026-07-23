@@ -1,0 +1,11 @@
+{
+  "name": "MoveOn",
+  "short_name": "MoveOn",
+  "description": "MoveOn study room",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F7F3E8",
+  "theme_color": "#F7F3E8"
+}

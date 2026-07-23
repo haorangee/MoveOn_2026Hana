@@ -26,7 +26,16 @@
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/icon.png"
+      "favicon": "./assets/icon.png",
+      "name": "MoveOn",
+      "shortName": "MoveOn",
+      "scope": "/",
+      "startUrl": "/",
+      "display": "standalone",
+      "orientation": "portrait",
+      "themeColor": "#F7F3E8",
+      "backgroundColor": "#F7F3E8",
+      "barStyle": "black-translucent"
     }
   }
 }

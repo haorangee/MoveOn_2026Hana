@@ -57,7 +57,13 @@ const initialProfile: MoveOnProfile = {
 
 const LEGACY_PET_NAME = '마루';
 
-function normalizeCachedProfile(value: unknown): MoveOnProfile | null {
+type CachedProfilePayload = {
+  profile: MoveOnProfile;
+  onboardingCompleted: boolean;
+  onboardingVersion: number;
+};
+
+function normalizeProfile(value: unknown): MoveOnProfile | null {
   if (!value || typeof value !== 'object') return null;
 
   const profile = value as Partial<MoveOnProfile>;
@@ -85,6 +91,42 @@ function normalizeCachedProfile(value: unknown): MoveOnProfile | null {
       ? profile.chapter
       : 'general',
     magazineNotificationEnabled: profile.magazineNotificationEnabled === true,
+  };
+}
+
+function normalizeCachedProfile(value: unknown): CachedProfilePayload | null {
+  if (!value || typeof value !== 'object') return null;
+
+  const payload = value as Partial<CachedProfilePayload>;
+  const wrappedProfile = normalizeProfile(payload.profile);
+  if (wrappedProfile) {
+    return {
+      profile: wrappedProfile,
+      onboardingCompleted: payload.onboardingCompleted === true,
+      onboardingVersion: typeof payload.onboardingVersion === 'number'
+        ? Math.max(0, Math.floor(payload.onboardingVersion))
+        : 0,
+    };
+  }
+
+  const legacyProfile = normalizeProfile(value);
+  return legacyProfile
+    ? {
+      profile: legacyProfile,
+      onboardingCompleted: false,
+      onboardingVersion: 0,
+    }
+    : null;
+}
+
+function cachedProfilePayload(
+  profile: MoveOnProfile,
+  onboardingCompleted: boolean,
+): CachedProfilePayload {
+  return {
+    profile,
+    onboardingCompleted,
+    onboardingVersion: onboardingCompleted ? CURRENT_ONBOARDING_VERSION : 0,
   };
 }
 
@@ -161,7 +203,7 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
     setIsHydrated(false);
 
     async function hydrateProfile() {
-      let cachedProfile: MoveOnProfile | null = null;
+      let cachedProfile: CachedProfilePayload | null = null;
       let loginProfile: MoveOnProfile | null = null;
 
       try {
@@ -169,10 +211,12 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
         if (savedProfile) {
           cachedProfile = normalizeCachedProfile(JSON.parse(savedProfile));
           if (active && cachedProfile) {
-            setProfile(cachedProfile);
-            setIsOnboarded(true);
-            setIsHydrated(true);
-            loginProfile = cachedProfile;
+            const cachedOnboardingCompleted = cachedProfile.onboardingCompleted
+              && cachedProfile.onboardingVersion >= CURRENT_ONBOARDING_VERSION;
+            setProfile(cachedProfile.profile);
+            setIsOnboarded(cachedOnboardingCompleted);
+            if (cachedOnboardingCompleted) setIsHydrated(true);
+            loginProfile = cachedProfile.profile;
           }
         }
       } catch {
@@ -186,18 +230,21 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
         const remoteProfile = await loadUserProfile(currentUserId);
         if (!active) return;
 
-        if (remoteProfile?.onboardingCompleted) {
+        if (remoteProfile) {
           const nextProfile = toMoveOnProfile(remoteProfile);
+          const onboardingCompleted = remoteProfile.onboardingCompleted
+            && remoteProfile.onboardingVersion >= CURRENT_ONBOARDING_VERSION;
           setProfile(nextProfile);
-          setIsOnboarded(true);
+          setIsOnboarded(onboardingCompleted);
           loginProfile = nextProfile;
-          await AsyncStorage.setItem(profileStorageKey(currentUserId), JSON.stringify(nextProfile));
-        } else if (cachedProfile) {
-          await saveUserProfile(currentUserId, toUserProfile(cachedProfile));
-          loginProfile = cachedProfile;
+          await AsyncStorage.setItem(
+            profileStorageKey(currentUserId),
+            JSON.stringify(cachedProfilePayload(nextProfile, onboardingCompleted)),
+          );
         } else {
           setProfile(initialProfile);
           setIsOnboarded(false);
+          await AsyncStorage.removeItem(profileStorageKey(currentUserId));
         }
 
         void recordFirebaseLogin(loginProfile).catch(() => undefined);
@@ -232,7 +279,10 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
         }
 
         setUserId(user.uid);
-        await AsyncStorage.setItem(profileStorageKey(user.uid), JSON.stringify(nextProfile));
+        await AsyncStorage.setItem(
+          profileStorageKey(user.uid),
+          JSON.stringify(cachedProfilePayload(nextProfile, true)),
+        );
         await saveUserProfile(user.uid, toUserProfile(nextProfile));
         await saveFirebaseUserProfile(nextProfile);
         setSyncStatus('synced');
@@ -246,6 +296,7 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
       setIsOnboarded(false);
       if (currentUserId) {
         await AsyncStorage.removeItem(profileStorageKey(currentUserId));
+        await onboardingRepository.clear(currentUserId);
       }
 
       if (currentUserId) {
