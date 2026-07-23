@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 
 const messyFloorImage = require('../../../../assets/messy-floor-layer-anime.png');
+const broomImage = require('../../../../assets/broom-cleaning.png');
 
 export const CLEANING_INTERVAL_DAYS = 1; // MVP: 1일, 정식 버전: 2일
 
@@ -136,7 +137,7 @@ export function CleaningLayer({ disabled = false }: CleaningLayerProps) {
     });
   }, [broomSweep, floorOpacity, isCleaning]);
 
-  const canPressBroom = isMessy && !disabled && !isCleaning;
+  const canPressBroom = !disabled && !isCleaning;
 
   return (
     <>
@@ -149,8 +150,7 @@ export function CleaningLayer({ disabled = false }: CleaningLayerProps) {
         </Animated.View>
       ) : null}
 
-      {isMessy ? (
-        <Animated.View
+      <Animated.View
           style={[
             styles.broomStage,
             {
@@ -170,7 +170,7 @@ export function CleaningLayer({ disabled = false }: CleaningLayerProps) {
                 {
                   rotate: broomSweep.interpolate({
                     inputRange: [0, 1],
-                    outputRange: ['-18deg', '-31deg'],
+                    outputRange: ['18deg', '31deg'],
                   }),
                 },
               ],
@@ -182,23 +182,22 @@ export function CleaningLayer({ disabled = false }: CleaningLayerProps) {
             accessibilityLabel="방 청소 빗자루"
             accessibilityRole="button"
             disabled={!canPressBroom}
+            hitSlop={18}
             onPress={() => setShowConfirm(true)}
             style={({ pressed }) => [
               styles.broomTouchArea,
               pressed && styles.pressed,
-              !canPressBroom && styles.disabled,
+              isCleaning && styles.disabled,
             ]}
           >
-            <View pointerEvents="none" style={styles.broomHandle} />
-            <View pointerEvents="none" style={styles.broomNeck} />
-            <View pointerEvents="none" style={styles.broomBrush}>
-              <View style={styles.bristle} />
-              <View style={styles.bristle} />
-              <View style={styles.bristle} />
-            </View>
+            <Image
+              contentFit="contain"
+              pointerEvents="none"
+              source={broomImage}
+              style={styles.broomImage}
+            />
           </Pressable>
-        </Animated.View>
-      ) : null}
+      </Animated.View>
 
       <Modal
         animationType="fade"
@@ -249,59 +248,25 @@ const styles = StyleSheet.create({
   },
   broomStage: {
     position: 'absolute',
-    left: '48%',
-    top: '60%',
-    width: '13%',
-    height: '17%',
+    right: '3%',
+    top: '58%',
+    width: 50,
+    height: 100,
+    zIndex: 18,
+    elevation: 18,
   },
   broomTouchArea: {
     position: 'absolute',
-    left: '-24%',
-    top: '-18%',
-    right: '-20%',
-    bottom: '-18%',
+    left: '-36%',
+    top: '-14%',
+    right: '-28%',
+    bottom: '-12%',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  broomHandle: {
-    position: 'absolute',
-    width: 5,
-    height: '86%',
-    borderRadius: 4,
-    backgroundColor: '#8A6544',
-    shadowColor: '#3A2A20',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.22,
-    shadowRadius: 4,
-  },
-  broomNeck: {
-    position: 'absolute',
-    bottom: '16%',
-    width: 14,
-    height: 11,
-    borderRadius: 4,
-    backgroundColor: '#6F5138',
-  },
-  broomBrush: {
-    position: 'absolute',
-    bottom: '2%',
-    width: 38,
-    height: 28,
-    borderTopLeftRadius: 13,
-    borderTopRightRadius: 13,
-    borderBottomLeftRadius: 7,
-    borderBottomRightRadius: 7,
-    backgroundColor: '#C7A66A',
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-evenly',
-    paddingBottom: 3,
-  },
-  bristle: {
-    width: 2,
-    height: 17,
-    borderRadius: 2,
-    backgroundColor: 'rgba(89, 65, 42, 0.26)',
+  broomImage: {
+    width: '100%',
+    height: '100%',
   },
   pressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
   disabled: { opacity: 0.58 },
