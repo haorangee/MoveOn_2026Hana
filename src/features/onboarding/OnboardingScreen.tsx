@@ -27,16 +27,20 @@ export function OnboardingScreen() {
   const params = useLocalSearchParams<{ mode?: string }>();
   const replay = params.mode === 'replay';
   const { completeOnboarding, profile, userId } = useOnboarding();
-  const { state, isHydrated, update, complete } = useOnboardingTutorial({
-    nickname: profile.name,
-    birthDate: profile.birthDate,
-    selectedPetSpecies: profile.petSpecies,
-    petName: profile.petName,
-    selectedCharacterId: profile.characterId,
-    selectedChapter: profile.chapter,
-    magazineNotificationEnabled: profile.magazineNotificationEnabled,
-    firstBookCreated: false,
-  }, replay, userId ?? 'guest');
+  const { state, isHydrated, update, complete } = useOnboardingTutorial(
+    {
+      nickname: profile.name,
+      birthDate: profile.birthDate,
+      selectedPetSpecies: profile.petSpecies,
+      petName: profile.petName,
+      selectedCharacterId: profile.characterId,
+      selectedChapter: profile.chapter,
+      magazineNotificationEnabled: profile.magazineNotificationEnabled,
+      firstBookCreated: false,
+    },
+    replay,
+    userId ?? 'guest',
+  );
   const [showSkipNotice, setShowSkipNotice] = useState(false);
 
   const goToNextGuide = useCallback(() => {
@@ -64,7 +68,7 @@ export function OnboardingScreen() {
     if (!replay) {
       const birthDate = state.birthDate || profile.birthDate;
       await completeOnboarding({
-        name: state.nickname.trim() || '무브너',
+        name: state.nickname.trim() || 'MoveOn 사용자',
         age: calculateAge(birthDate),
         birthDate,
         petSpecies: state.selectedPetSpecies,
@@ -72,18 +76,21 @@ export function OnboardingScreen() {
         characterId: state.selectedCharacterId,
         chapter: state.selectedChapter,
         magazineNotificationEnabled: state.magazineNotificationEnabled === true,
+        totalXp: profile.totalXp ?? 0,
+        level: profile.level ?? 1,
+        grapes: profile.grapes ?? 0,
       });
     }
 
     await complete();
     router.replace('/(tabs)');
-  }, [complete, completeOnboarding, profile.birthDate, replay, router, state]);
+  }, [complete, completeOnboarding, profile.birthDate, profile.grapes, profile.level, profile.totalXp, replay, router, state]);
 
   if (!isHydrated) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator color="#7B8662" />
-        <Text style={styles.loadingText}>방을 준비하고 있어요.</Text>
+        <Text style={styles.loadingText}>방을 준비하고 있어요...</Text>
       </View>
     );
   }
@@ -167,9 +174,9 @@ export function OnboardingScreen() {
 
           {showSkipNotice ? (
             <View style={styles.skipNotice}>
-              <Text style={styles.skipTitle}>첫 행동 체험을 건너뛸까요?</Text>
+              <Text style={styles.skipTitle}>튜토리얼을 건너뛰시겠어요?</Text>
               <Text style={styles.skipDescription}>
-                튜토리얼은 나중에 설정에서 다시 볼 수 있어요.
+                첫 행동 튜토리얼과 기본 설정은 나중에 다시 볼 수 있어요.
               </Text>
               <View style={styles.skipActions}>
                 <Pressable
@@ -182,7 +189,7 @@ export function OnboardingScreen() {
                   onPress={() => void finishOnboarding()}
                   style={({ pressed }) => [styles.skipButton, pressed && styles.pressed]}
                 >
-                  <Text style={styles.skipButtonText}>내 방으로 가기</Text>
+                  <Text style={styles.skipButtonText}>홈으로 가기</Text>
                 </Pressable>
               </View>
             </View>

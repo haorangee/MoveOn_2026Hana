@@ -12,4 +12,7 @@ export type UserProfile = {
   magazineNotificationEnabled: boolean;
   onboardingCompleted: boolean;
   onboardingVersion: number;
+  totalXp?: number;
+  level?: number;
+  grapes?: number;
 };

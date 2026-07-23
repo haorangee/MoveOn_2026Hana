@@ -16,6 +16,8 @@ import {
 import { useAuth } from '@/features/auth/AuthProvider';
 import { useOnboarding } from '@/features/onboarding/OnboardingProvider';
 import { createCleaningSession, completeCleaningSession } from '@/features/home/data/cleaningRepository';
+import { ActivityRewardModal } from '@/features/activity/rewards/components/ActivityRewardModal';
+import { useActivityRewardModal } from '@/features/activity/rewards/hooks/useActivityRewardModal';
 import { Card } from '@/shared/components/Card';
 import { Screen } from '@/shared/components/Screen';
 import { Body, Heading, Muted, Title } from '@/shared/components/Typography';
@@ -38,6 +40,13 @@ export function CleaningScreen() {
   const [completedAt, setCompletedAt] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [permissionRequested, setPermissionRequested] = useState(false);
+  const {
+    rewardResult,
+    rewardModalVisible,
+    rewardCategoryId,
+    showRewardResult,
+    clearRewardResult,
+  } = useActivityRewardModal();
 
   const hasBeforePhoto = Boolean(beforeImageUri);
   const hasAfterPhoto = Boolean(afterImageUri);
@@ -108,16 +117,21 @@ export function CleaningScreen() {
     if (!user || !cleaningSessionId || !afterImageUri) return;
     setIsSaving(true);
     try {
-      const url = await completeCleaningSession(user.uid, cleaningSessionId, afterImageUri);
+      const { afterImageUrl: url, rewardResult: nextRewardResult } = await completeCleaningSession(user.uid, cleaningSessionId, afterImageUri);
       setAfterImageUrl(url);
       setCompletedAt(new Date().toISOString());
       await AsyncStorage.setItem(CLEANING_STORAGE_KEY, String(Date.now()));
-      setPhase('result');
+      showRewardResult('cleaning', nextRewardResult);
     } catch {
       Alert.alert('청소 완료를 저장할 수 없어요', '애프터 사진 저장에 실패했습니다. 다시 시도해 주세요.');
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const confirmReward = () => {
+    clearRewardResult();
+    setPhase('result');
   };
 
   const goHome = () => {
@@ -324,6 +338,13 @@ export function CleaningScreen() {
           </Pressable>
         </Card>
       ) : null}
+
+      <ActivityRewardModal
+        visible={rewardModalVisible}
+        categoryId={rewardCategoryId ?? 'cleaning'}
+        result={rewardResult}
+        onConfirm={confirmReward}
+      />
     </Screen>
   );
 }

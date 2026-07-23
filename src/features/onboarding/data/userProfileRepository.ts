@@ -60,6 +60,9 @@ export async function loadUserProfile(userId: string): Promise<UserProfile | nul
     onboardingVersion: typeof data.onboardingVersion === 'number'
       ? Math.max(0, Math.floor(data.onboardingVersion))
       : 0,
+    totalXp: typeof data.totalXp === 'number' ? Math.max(0, Math.floor(data.totalXp)) : 0,
+    level: typeof data.level === 'number' ? Math.max(1, Math.floor(data.level)) : 1,
+    grapes: typeof data.grapes === 'number' ? Math.max(0, Math.floor(data.grapes)) : 0,
   };
 }
 
