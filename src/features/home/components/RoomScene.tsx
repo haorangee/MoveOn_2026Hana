@@ -24,11 +24,13 @@ import {
 import { RoomBackdrop } from '@/features/home/components/RoomBackdrop';
 import { StudyBookshelfOverlay } from '@/features/home/components/StudyBookshelfOverlay';
 import { TopGameStatus } from '@/features/home/components/TopGameStatus';
+import { WaterMissionLayer } from '@/features/home/components/WaterMissionLayer';
 import {
   roomHotspots,
   type RoomActivity,
   type RoomHotspot,
 } from '@/features/home/roomData';
+import { createEmptyWaterMissionState, type WaterMissionState } from '@/features/home/waterMission';
 
 const lifestyleRoute: RoomActivity[] = [
   'window',
@@ -79,6 +81,9 @@ export function RoomScene({
   const [activity, setActivity] = useState<RoomActivity>(initialActivity);
   const [sceneSize, setSceneSize] = useState({ width: 0, height: 0 });
   const [weather, setWeather] = useState<RoomWeather>(() => getInitialMockWeather());
+  const [waterMissionState, setWaterMissionState] = useState<WaterMissionState>(() => (
+    createEmptyWaterMissionState()
+  ));
   const cameraScale = useRef(new Animated.Value(1)).current;
   const cameraX = useRef(new Animated.Value(0)).current;
   const cameraY = useRef(new Animated.Value(0)).current;
@@ -357,6 +362,10 @@ export function RoomScene({
         <RoomBackdrop />
         <RoomAtmosphere weather={weather} />
         <CleaningLayer disabled={focusedObject !== null} />
+        <WaterMissionLayer
+          disabled={focusedObject !== null}
+          onMissionStateChange={setWaterMissionState}
+        />
         <StudyBookshelfOverlay
           disabled={focusedObject !== null}
           onOpen={() => {
@@ -365,7 +374,7 @@ export function RoomScene({
           }}
           openingProgress={bookshelfOpenProgress}
         />
-        <QuestMemoBoard />
+        <QuestMemoBoard waterCompleted={waterMissionState.missionCompleted} />
         <NewspaperProp />
 
         <CharacterCompanionGroup
