@@ -113,6 +113,7 @@ export const roomHotspots: RoomHotspot[] = [
     actionLabel: '방 청소하기',
     feedback: '마루가 신나게 따라다니며 청소를 돕고 있어요.',
     activity: 'walking',
+    route: '/cleaning' as Href,
     frame: { left: '18%', top: '61%', width: '40%', height: '28%' },
     focus: { x: 0.4, y: 0.73, scale: 1.36 },
   },
