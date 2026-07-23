@@ -8,7 +8,11 @@ import {
 
 type TutorialSeed = Partial<OnboardingState>;
 
-export function useOnboardingTutorial(seed: TutorialSeed, replay = false) {
+export function useOnboardingTutorial(
+  seed: TutorialSeed,
+  replay = false,
+  userId = 'guest',
+) {
   const seedState = useMemo(
     () => normalizeOnboardingState({ ...defaultOnboardingState, ...seed }),
     // The profile seed is only used during the first hydration.
@@ -22,7 +26,7 @@ export function useOnboardingTutorial(seed: TutorialSeed, replay = false) {
     let active = true;
 
     async function hydrate() {
-      const saved = await onboardingRepository.load();
+      const saved = await onboardingRepository.load(userId);
       if (!active) return;
 
       if (saved) {
@@ -37,15 +41,15 @@ export function useOnboardingTutorial(seed: TutorialSeed, replay = false) {
     return () => {
       active = false;
     };
-  }, [replay]);
+  }, [replay, userId]);
 
   const update = useCallback((patch: Partial<OnboardingState>) => {
     setState((current) => {
       const next = normalizeOnboardingState({ ...current, ...patch });
-      void onboardingRepository.save(next);
+      void onboardingRepository.save(userId, next);
       return next;
     });
-  }, []);
+  }, [userId]);
 
   const complete = useCallback(async () => {
     const next = normalizeOnboardingState({
@@ -55,9 +59,9 @@ export function useOnboardingTutorial(seed: TutorialSeed, replay = false) {
       tutorialCompleted: true,
     });
     setState(next);
-    await onboardingRepository.save(next);
+    await onboardingRepository.save(userId, next);
     return next;
-  }, [state]);
+  }, [state, userId]);
 
   return { state, isHydrated, update, complete };
 }

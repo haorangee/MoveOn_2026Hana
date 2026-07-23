@@ -26,7 +26,7 @@ export function OnboardingScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ mode?: string }>();
   const replay = params.mode === 'replay';
-  const { completeOnboarding, profile } = useOnboarding();
+  const { completeOnboarding, profile, userId } = useOnboarding();
   const { state, isHydrated, update, complete } = useOnboardingTutorial({
     nickname: profile.name,
     birthDate: profile.birthDate,
@@ -36,7 +36,7 @@ export function OnboardingScreen() {
     selectedChapter: profile.chapter,
     magazineNotificationEnabled: profile.magazineNotificationEnabled,
     firstBookCreated: false,
-  }, replay);
+  }, replay, userId ?? 'guest');
   const [showSkipNotice, setShowSkipNotice] = useState(false);
 
   const goToNextGuide = useCallback(() => {

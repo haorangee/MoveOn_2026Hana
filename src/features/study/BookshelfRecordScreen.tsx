@@ -34,6 +34,15 @@ export function BookshelfRecordScreen() {
   const newBook = useMemo(() => createStudyBookFromResult(params), [params]);
   const newBookCategory = newBook ? getStudyCategory(newBook.categoryId) : null;
   const showNewBook = newBook !== null && placedBookId !== newBook.id;
+  const sortedCategorySummaries = useMemo(() => (
+    categorySummaries
+      .map((category, originalIndex) => ({ category, originalIndex }))
+      .sort((a, b) => (
+        (b.category.minutes - a.category.minutes)
+        || (a.originalIndex - b.originalIndex)
+      ))
+      .map(({ category }) => category)
+  ), [categorySummaries]);
   const totalBookCount = categorySummaries.reduce(
     (total, category) => total + category.books.length,
     0,
@@ -208,7 +217,7 @@ export function BookshelfRecordScreen() {
             },
           ]}
         >
-          {categorySummaries.map((category) => (
+          {sortedCategorySummaries.map((category) => (
             <View key={category.id} style={styles.shelfSection}>
               <View style={styles.shelfLabelRow}>
                 <View style={[styles.legendDot, { backgroundColor: category.color }]} />

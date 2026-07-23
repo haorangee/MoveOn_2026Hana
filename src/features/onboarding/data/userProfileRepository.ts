@@ -21,6 +21,7 @@ export async function ensureUserProfileDocument(userId: string) {
 
   await setDoc(reference, {
     onboardingCompleted: false,
+    onboardingVersion: 0,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -56,6 +57,9 @@ export async function loadUserProfile(userId: string): Promise<UserProfile | nul
       : 'general',
     magazineNotificationEnabled: data.magazineNotificationEnabled === true,
     onboardingCompleted: data.onboardingCompleted === true,
+    onboardingVersion: typeof data.onboardingVersion === 'number'
+      ? Math.max(0, Math.floor(data.onboardingVersion))
+      : 0,
   };
 }
 

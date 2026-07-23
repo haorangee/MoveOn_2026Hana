@@ -27,24 +27,6 @@ type HandwritingStroke = {
   opacity: number;
 };
 
-type Point = { x: number; y: number };
-
-type SegmentGeometry = {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-  rotate: string;
-};
-
-type OutfitAppearance = {
-  base: string;
-  border: string;
-  cuff: string;
-  detail: string;
-  pattern: 'plain' | 'ribbed' | 'cable' | 'lace';
-};
-
 const handwritingPatterns: HandwritingStroke[][] = [
   [
     { left: 1, width: 16, top: 1, rotate: -1.3, opacity: 0.58 },
@@ -101,223 +83,18 @@ const handwritingPatterns: HandwritingStroke[][] = [
   ],
 ];
 const sceneSource = { width: 941, height: 1672 };
+const studySceneSources: Record<CharacterId, number> = {
+  daily: require('../../../assets/images/study/moveon-study-scene-daily-v2.png'),
+  cozy: require('../../../assets/images/study/moveon-study-scene-cozy-v2.png'),
+  casual: require('../../../assets/images/study/moveon-study-scene-casual-v2.png'),
+  neat: require('../../../assets/images/study/moveon-study-scene-neat-v2.png'),
+  ropan: require('../../../assets/images/study/moveon-study-scene-ropan-v2.png'),
+};
 // The generated scene is almost top-down. Keep live ink on the clear upper
 // portion of the right page so it never paints over the character's hand.
 const notebookSourceFrame = { x: 500, y: 620, width: 310, height: 290 };
 const rightPageSourceFrame = { x: 470, y: 582, width: 370, height: 570 };
-const writingArmSourceSize = { width: 1086, height: 1448 };
-const writingArmNib = { x: 286, y: 270 };
-const writingArmElbow = { x: 1020, y: 1415 };
-const restingArmSourceSize = { width: 941, height: 1672 };
-const restingArmShoulder = { x: 86, y: 1630 };
-const restingArmWrist = { x: 346, y: 654 };
-const rightShoulder = { x: 885, y: 1580 };
-const leftShoulder = { x: 58, y: 1582 };
-const leftElbow = { x: 62, y: 1320 };
-const leftWrist = { x: 166, y: 1070 };
-const upperArmLength = 410;
-const forearmLength = 590;
 const pageGuideLines = Array.from({ length: 15 });
-const sleeveTextureLines = Array.from({ length: 4 });
-
-const outfitAppearances: Record<CharacterId, OutfitAppearance> = {
-  daily: {
-    base: '#E9DFC9',
-    border: '#C8B89E',
-    cuff: '#D7C8AF',
-    detail: 'rgba(146, 122, 91, 0.2)',
-    pattern: 'ribbed',
-  },
-  cozy: {
-    base: '#E8D5B5',
-    border: '#C2A67E',
-    cuff: '#D3B98E',
-    detail: 'rgba(139, 103, 64, 0.25)',
-    pattern: 'cable',
-  },
-  casual: {
-    base: '#B9BEC0',
-    border: '#899194',
-    cuff: '#A4AAAC',
-    detail: 'rgba(71, 82, 87, 0.2)',
-    pattern: 'plain',
-  },
-  neat: {
-    base: '#F3EDE3',
-    border: '#CBBCA7',
-    cuff: '#DDD0BB',
-    detail: 'rgba(128, 104, 76, 0.18)',
-    pattern: 'ribbed',
-  },
-  ropan: {
-    base: '#E8C1BC',
-    border: '#C79FA1',
-    cuff: '#F0D7CE',
-    detail: 'rgba(147, 92, 102, 0.22)',
-    pattern: 'lace',
-  },
-};
-
-function distanceBetween(a: Point, b: Point) {
-  return Math.hypot(b.x - a.x, b.y - a.y);
-}
-
-function pointBetween(start: Point, end: Point, progress: number): Point {
-  return {
-    x: start.x + ((end.x - start.x) * progress),
-    y: start.y + ((end.y - start.y) * progress),
-  };
-}
-
-function solveElbow(shoulder: Point, target: Point) {
-  const dx = target.x - shoulder.x;
-  const dy = target.y - shoulder.y;
-  const targetDistance = Math.max(1, Math.hypot(dx, dy));
-  const minReach = Math.abs(forearmLength - upperArmLength) + 1;
-  const maxReach = forearmLength + upperArmLength - 1;
-  const solvedDistance = Math.min(maxReach, Math.max(minReach, targetDistance));
-  const direction = { x: dx / targetDistance, y: dy / targetDistance };
-  const solvedTarget = {
-    x: shoulder.x + direction.x * solvedDistance,
-    y: shoulder.y + direction.y * solvedDistance,
-  };
-  const shoulderToProjection = (
-    (upperArmLength ** 2)
-    - (forearmLength ** 2)
-    + (solvedDistance ** 2)
-  ) / (2 * solvedDistance);
-  const elbowOffset = Math.sqrt(Math.max(
-    0,
-    (upperArmLength ** 2) - (shoulderToProjection ** 2),
-  ));
-  const projection = {
-    x: shoulder.x + direction.x * shoulderToProjection,
-    y: shoulder.y + direction.y * shoulderToProjection,
-  };
-  const rightSideNormal = { x: -direction.y, y: direction.x };
-
-  return {
-    elbow: {
-      x: projection.x + rightSideNormal.x * elbowOffset,
-      y: projection.y + rightSideNormal.y * elbowOffset,
-    },
-    target: solvedTarget,
-  };
-}
-
-function placeSegment(
-  sourceSize: { width: number; height: number },
-  sourceStart: Point,
-  sourceEnd: Point,
-  worldStart: Point,
-  worldEnd: Point,
-  coverScale: number,
-  offsetX: number,
-  offsetY: number,
-): SegmentGeometry {
-  const sourceAngle = Math.atan2(
-    sourceEnd.y - sourceStart.y,
-    sourceEnd.x - sourceStart.x,
-  );
-  const worldAngle = Math.atan2(
-    worldEnd.y - worldStart.y,
-    worldEnd.x - worldStart.x,
-  );
-  const rotation = worldAngle - sourceAngle;
-  const assetScale = (distanceBetween(worldStart, worldEnd) / distanceBetween(sourceStart, sourceEnd))
-    * coverScale;
-  const width = sourceSize.width * assetScale;
-  const height = sourceSize.height * assetScale;
-  const center = { x: width / 2, y: height / 2 };
-  const scaledStart = {
-    x: sourceStart.x * assetScale,
-    y: sourceStart.y * assetScale,
-  };
-  const startFromCenter = {
-    x: scaledStart.x - center.x,
-    y: scaledStart.y - center.y,
-  };
-  const rotatedStart = {
-    x: (startFromCenter.x * Math.cos(rotation)) - (startFromCenter.y * Math.sin(rotation)),
-    y: (startFromCenter.x * Math.sin(rotation)) + (startFromCenter.y * Math.cos(rotation)),
-  };
-
-  return {
-    left: offsetX + (worldStart.x * coverScale) - center.x - rotatedStart.x,
-    top: offsetY + (worldStart.y * coverScale) - center.y - rotatedStart.y,
-    width,
-    height,
-    rotate: `${rotation * 180 / Math.PI}deg`,
-  };
-}
-
-function placeBone(
-  start: Point,
-  end: Point,
-  sourceThickness: number,
-  coverScale: number,
-  offsetX: number,
-  offsetY: number,
-): SegmentGeometry {
-  const startOnScreen = {
-    x: offsetX + (start.x * coverScale),
-    y: offsetY + (start.y * coverScale),
-  };
-  const endOnScreen = {
-    x: offsetX + (end.x * coverScale),
-    y: offsetY + (end.y * coverScale),
-  };
-  const width = distanceBetween(startOnScreen, endOnScreen);
-  const height = sourceThickness * coverScale;
-
-  return {
-    left: ((startOnScreen.x + endOnScreen.x) / 2) - (width / 2),
-    top: ((startOnScreen.y + endOnScreen.y) / 2) - (height / 2),
-    width,
-    height,
-    rotate: `${Math.atan2(
-      endOnScreen.y - startOnScreen.y,
-      endOnScreen.x - startOnScreen.x,
-    ) * 180 / Math.PI}deg`,
-  };
-}
-
-function SleeveTexture({ appearance, showCuff }: {
-  appearance: OutfitAppearance;
-  showCuff: boolean;
-}) {
-  return (
-    <>
-      {appearance.pattern !== 'plain' ? (
-        <View style={styles.sleeveTexture}>
-          {sleeveTextureLines.map((_, index) => (
-            <View
-              key={index}
-              style={[
-                styles.sleeveTextureLine,
-                {
-                  backgroundColor: appearance.detail,
-                  left: `${18 + (index * 18)}%`,
-                  transform: [{ rotate: appearance.pattern === 'cable' ? '8deg' : '0deg' }],
-                },
-              ]}
-            />
-          ))}
-        </View>
-      ) : null}
-      {appearance.pattern === 'lace' ? (
-        <View style={[styles.laceEdge, { borderColor: appearance.detail }]} />
-      ) : null}
-      {showCuff ? (
-        <View style={[
-          styles.sleeveCuff,
-          { backgroundColor: appearance.cuff, borderColor: appearance.border },
-        ]}
-        />
-      ) : null}
-    </>
-  );
-}
 
 export function StudyScene({
   characterId = 'daily',
@@ -330,12 +107,10 @@ export function StudyScene({
 }: StudySceneProps) {
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const sceneFocus = useRef(new Animated.Value(isStarted ? 1 : 0)).current;
-  const writingMotion = useRef(new Animated.Value(0)).current;
   const breathingMotion = useRef(new Animated.Value(0)).current;
   const pageFlip = useRef(new Animated.Value(0)).current;
   const notebookClose = useRef(new Animated.Value(0)).current;
   const previousCompletedPages = useRef(completedPages);
-  const outfit = outfitAppearances[characterId];
 
   useEffect(() => {
     const animation = Animated.timing(sceneFocus, {
@@ -347,32 +122,6 @@ export function StudyScene({
     animation.start();
     return () => animation.stop();
   }, [isStarted, sceneFocus]);
-
-  useEffect(() => {
-    if (!isStarted || !isRunning || isPaused || isCompleting) {
-      writingMotion.stopAnimation();
-      return undefined;
-    }
-
-    const writingLoop = Animated.loop(Animated.sequence([
-      Animated.timing(writingMotion, {
-        toValue: 1,
-        duration: 1900,
-        easing: Easing.inOut(Easing.sin),
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-      Animated.timing(writingMotion, {
-        toValue: 0,
-        duration: 480,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-      Animated.delay(720),
-    ]));
-
-    writingLoop.start();
-    return () => writingLoop.stop();
-  }, [isCompleting, isPaused, isRunning, isStarted, writingMotion]);
 
   useEffect(() => {
     if (!isStarted || isCompleting) {
@@ -430,11 +179,6 @@ export function StudyScene({
     return () => closeAnimation.stop();
   }, [isCompleting, notebookClose]);
 
-  const writingLineIndex = Math.min(
-    handwritingPatterns.length - 1,
-    Math.floor(currentPageProgress * handwritingPatterns.length),
-  );
-
   const lineProgresses = useMemo(() => (
     handwritingPatterns.map((_, index) => {
       const lineStart = index / handwritingPatterns.length;
@@ -445,25 +189,6 @@ export function StudyScene({
     })
   ), [currentPageProgress]);
 
-  const activePenPosition = useMemo(() => {
-    const activePattern = handwritingPatterns[writingLineIndex];
-    const lineProgress = lineProgresses[writingLineIndex] ?? 0;
-    const strokeCursor = lineProgress * activePattern.length;
-    const strokeIndex = Math.min(
-      activePattern.length - 1,
-      Math.floor(strokeCursor),
-    );
-    const stroke = activePattern[strokeIndex];
-    const strokeProgress = lineProgress >= 1
-      ? 1
-      : Math.max(0, Math.min(1, strokeCursor - strokeIndex));
-
-    return {
-      xPercent: stroke.left + (stroke.width * strokeProgress),
-      lineIndex: writingLineIndex,
-    };
-  }, [lineProgresses, writingLineIndex]);
-
   const sceneGeometry = useMemo(() => {
     const coverScale = Math.max(
       viewportWidth / sceneSource.width,
@@ -473,41 +198,6 @@ export function StudyScene({
     const renderedHeight = sceneSource.height * coverScale;
     const offsetX = (viewportWidth - renderedWidth) / 2;
     const offsetY = (viewportHeight - renderedHeight) / 2;
-
-    const notebookPaddingX = notebookSourceFrame.width * 0.08;
-    const notebookPaddingTop = notebookSourceFrame.height * 0.08;
-    const notebookContentWidth = notebookSourceFrame.width - (notebookPaddingX * 2);
-    const notebookContentHeight = notebookSourceFrame.height - notebookPaddingTop;
-    const lineHeight = notebookContentHeight * 0.122;
-    const activePenSourceX = notebookSourceFrame.x
-      + notebookPaddingX
-      + (notebookContentWidth * activePenPosition.xPercent / 100);
-    const activePenSourceY = notebookSourceFrame.y
-      + notebookPaddingTop
-      + ((activePenPosition.lineIndex + 0.5) * lineHeight);
-    const penTarget = { x: activePenSourceX, y: activePenSourceY };
-    const solvedArm = solveElbow(rightShoulder, penTarget);
-    const rightWrist = pointBetween(solvedArm.elbow, solvedArm.target, 0.64);
-    const writingArm = placeSegment(
-      writingArmSourceSize,
-      writingArmElbow,
-      writingArmNib,
-      solvedArm.elbow,
-      solvedArm.target,
-      coverScale,
-      offsetX,
-      offsetY,
-    );
-    const restingArm = placeSegment(
-      restingArmSourceSize,
-      restingArmShoulder,
-      restingArmWrist,
-      leftShoulder,
-      leftWrist,
-      coverScale,
-      offsetX,
-      offsetY,
-    );
 
     return {
       notebook: {
@@ -524,63 +214,8 @@ export function StudyScene({
         width: rightPageSourceFrame.width * coverScale,
         height: rightPageSourceFrame.height * coverScale,
       },
-      arm: {
-        bareUpperRight: placeBone(
-          rightShoulder,
-          solvedArm.elbow,
-          126,
-          coverScale,
-          offsetX,
-          offsetY,
-        ),
-        writing: writingArm,
-        resting: restingArm,
-        sleeveUpperRight: placeBone(
-          rightShoulder,
-          solvedArm.elbow,
-          176,
-          coverScale,
-          offsetX,
-          offsetY,
-        ),
-        sleeveForearmRight: placeBone(
-          solvedArm.elbow,
-          rightWrist,
-          158,
-          coverScale,
-          offsetX,
-          offsetY,
-        ),
-        sleeveUpperLeft: placeBone(
-          leftShoulder,
-          leftElbow,
-          174,
-          coverScale,
-          offsetX,
-          offsetY,
-        ),
-        sleeveForearmLeft: placeBone(
-          leftElbow,
-          leftWrist,
-          154,
-          coverScale,
-          offsetX,
-          offsetY,
-        ),
-      },
     };
-  }, [activePenPosition, viewportHeight, viewportWidth]);
-
-  const armOpacity = isStarted
-    ? pageFlip.interpolate({
-      inputRange: [0, 0.08, 0.42, 0.9, 1],
-      outputRange: [1, 1, 0, 0, 1],
-    })
-    : 0;
-  const writingTranslateX = writingMotion.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-1, 3],
-  });
+  }, [viewportHeight, viewportWidth]);
 
   return (
     <View pointerEvents="none" style={styles.scene}>
@@ -625,7 +260,7 @@ export function StudyScene({
       >
         <Animated.Image
           resizeMode="cover"
-          source={require('../../../assets/images/study/moveon-study-scene-writing-clean.png')}
+          source={studySceneSources[characterId]}
           style={styles.image}
         />
 
@@ -679,128 +314,6 @@ export function StudyScene({
             ]}
           />
         </View>
-
-        <Animated.View
-          style={[
-            styles.bareArmBone,
-            sceneGeometry.arm.bareUpperRight,
-            {
-              opacity: armOpacity,
-              transform: [
-                { translateX: writingTranslateX },
-                { translateY: isCompleting ? 18 : 0 },
-                { rotate: sceneGeometry.arm.bareUpperRight.rotate },
-              ],
-            },
-          ]}
-        />
-
-        <Animated.Image
-          resizeMode="contain"
-          source={require('../../../assets/images/study/moveon-resting-arm-bare.png')}
-          style={[
-            styles.articulatedArmSegment,
-            sceneGeometry.arm.resting,
-            {
-              opacity: armOpacity,
-              transform: [
-                { translateY: isCompleting ? 10 : 0 },
-                { rotate: sceneGeometry.arm.resting.rotate },
-              ],
-            },
-          ]}
-        />
-
-        <Animated.Image
-          resizeMode="contain"
-          source={require('../../../assets/images/study/moveon-writing-arm-bare.png')}
-          style={[
-            styles.articulatedArmSegment,
-            sceneGeometry.arm.writing,
-            {
-              opacity: armOpacity,
-              transform: [
-                { translateX: writingTranslateX },
-                { translateY: isCompleting ? 18 : 0 },
-                { rotate: sceneGeometry.arm.writing.rotate },
-              ],
-            },
-          ]}
-        />
-
-        <Animated.View
-          style={[
-            styles.outfitSleeveSegment,
-            sceneGeometry.arm.sleeveUpperLeft,
-            {
-              backgroundColor: outfit.base,
-              borderColor: outfit.border,
-              opacity: armOpacity,
-              transform: [
-                { translateY: isCompleting ? 10 : 0 },
-                { rotate: sceneGeometry.arm.sleeveUpperLeft.rotate },
-              ],
-            },
-          ]}
-        >
-          <SleeveTexture appearance={outfit} showCuff={false} />
-        </Animated.View>
-
-        <Animated.View
-          style={[
-            styles.outfitSleeveSegment,
-            sceneGeometry.arm.sleeveForearmLeft,
-            {
-              backgroundColor: outfit.base,
-              borderColor: outfit.border,
-              opacity: armOpacity,
-              transform: [
-                { translateY: isCompleting ? 10 : 0 },
-                { rotate: sceneGeometry.arm.sleeveForearmLeft.rotate },
-              ],
-            },
-          ]}
-        >
-          <SleeveTexture appearance={outfit} showCuff />
-        </Animated.View>
-
-        <Animated.View
-          style={[
-            styles.outfitSleeveSegment,
-            sceneGeometry.arm.sleeveUpperRight,
-            {
-              backgroundColor: outfit.base,
-              borderColor: outfit.border,
-              opacity: armOpacity,
-              transform: [
-                { translateX: writingTranslateX },
-                { translateY: isCompleting ? 18 : 0 },
-                { rotate: sceneGeometry.arm.sleeveUpperRight.rotate },
-              ],
-            },
-          ]}
-        >
-          <SleeveTexture appearance={outfit} showCuff={false} />
-        </Animated.View>
-
-        <Animated.View
-          style={[
-            styles.outfitSleeveSegment,
-            sceneGeometry.arm.sleeveForearmRight,
-            {
-              backgroundColor: outfit.base,
-              borderColor: outfit.border,
-              opacity: armOpacity,
-              transform: [
-                { translateX: writingTranslateX },
-                { translateY: isCompleting ? 18 : 0 },
-                { rotate: sceneGeometry.arm.sleeveForearmRight.rotate },
-              ],
-            },
-          ]}
-        >
-          <SleeveTexture appearance={outfit} showCuff />
-        </Animated.View>
 
         <Animated.View
           style={[
@@ -895,58 +408,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(91, 64, 40, 0.35)',
     backgroundColor: '#A98461',
-  },
-  articulatedArmSegment: {
-    position: 'absolute',
-  },
-  bareArmBone: {
-    position: 'absolute',
-    borderRadius: 999,
-    backgroundColor: '#E5A273',
-    borderWidth: 0.7,
-    borderColor: 'rgba(153, 92, 57, 0.3)',
-  },
-  outfitSleeveSegment: {
-    position: 'absolute',
-    overflow: 'hidden',
-    borderRadius: 999,
-    borderWidth: 1,
-    shadowColor: '#6D4B32',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  sleeveTexture: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
-    borderRadius: 999,
-  },
-  sleeveTextureLine: {
-    position: 'absolute',
-    top: '-20%',
-    width: 1.2,
-    height: '140%',
-    borderRadius: 1,
-  },
-  sleeveCuff: {
-    position: 'absolute',
-    top: '-8%',
-    right: '-1%',
-    width: '17%',
-    height: '116%',
-    borderLeftWidth: 1,
-    borderRadius: 999,
-  },
-  laceEdge: {
-    position: 'absolute',
-    top: '12%',
-    right: '4%',
-    width: '14%',
-    height: '76%',
-    borderWidth: 1,
-    borderStyle: 'dotted',
-    borderRadius: 999,
   },
   pageTurn: {
     position: 'absolute',
