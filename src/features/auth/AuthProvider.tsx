@@ -14,6 +14,7 @@ import {
 import { firebaseAuth } from '@/config/firebaseAuth';
 import {
   createEmailAccount,
+  ensureAnonymousUser,
   signInWithFirebaseCustomToken,
   signInWithEmail,
   signOutCurrentUser,
@@ -22,9 +23,11 @@ import {
 type AuthContextValue = {
   user: User | null;
   isReady: boolean;
+  isAuthenticated: boolean;
   isRegistered: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
+  signInAnonymously: () => Promise<void>;
   signInWithCustomToken: (customToken: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -36,6 +39,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [isRegistered, setIsRegistered] = useState(
     Boolean(firebaseAuth.currentUser && !firebaseAuth.currentUser.isAnonymous),
   );
+  const isAuthenticated = Boolean(user);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => onAuthStateChanged(firebaseAuth, (nextUser) => {
@@ -56,6 +60,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setIsRegistered(true);
   }, []);
 
+  const handleAnonymousSignIn = useCallback(async () => {
+    const nextUser = await ensureAnonymousUser();
+    setUser(nextUser);
+    setIsRegistered(false);
+  }, []);
+
   const handleCustomTokenSignIn = useCallback(async (customToken: string) => {
     const nextUser = await signInWithFirebaseCustomToken(customToken);
     setUser(nextUser);
@@ -71,12 +81,24 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const value = useMemo<AuthContextValue>(() => ({
     user,
     isReady,
+    isAuthenticated,
     isRegistered,
     signIn,
     signUp,
+    signInAnonymously: handleAnonymousSignIn,
     signInWithCustomToken: handleCustomTokenSignIn,
     signOut: handleSignOut,
-  }), [handleCustomTokenSignIn, handleSignOut, isReady, isRegistered, signIn, signUp, user]);
+  }), [
+    handleAnonymousSignIn,
+    handleCustomTokenSignIn,
+    handleSignOut,
+    isAuthenticated,
+    isReady,
+    isRegistered,
+    signIn,
+    signUp,
+    user,
+  ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

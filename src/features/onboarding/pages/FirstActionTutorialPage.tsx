@@ -190,6 +190,8 @@ export function FirstActionTutorialPage({
 
         {showingPage ? (
           <View pointerEvents="none" style={[styles.deskPage, step === 'notebook' && styles.openingPage]}>
+            <View style={styles.notebookSpine} />
+            <View style={styles.pageFold} />
             {Array.from({ length: 8 }, (_, index) => (
               <View
                 key={index}
@@ -228,14 +230,16 @@ export function FirstActionTutorialPage({
                   { translateX: bookTravel.interpolate({ inputRange: [0, 1], outputRange: [0, 112] }) },
                   { translateY: bookTravel.interpolate({ inputRange: [0, 1], outputRange: [0, -42] }) },
                   { scale: bookTravel.interpolate({ inputRange: [0, 1], outputRange: [1, 0.33] }) },
-                  { rotate: bookTravel.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '90deg'] }) },
+                  { rotate: bookTravel.interpolate({ inputRange: [0, 1], outputRange: ['-8deg', '90deg'] }) },
                 ],
               },
             ]}
           >
+            <View style={styles.bookPageBlock} />
+            <View style={styles.bookSpine} />
             <View style={styles.bookTopBand} />
             <Text style={styles.createdBookTitle}>{category.label}</Text>
-            <Text style={styles.createdBookMeta}>첫 페이지 · 5초</Text>
+            <Text style={styles.createdBookMeta}>첫 기록</Text>
           </Animated.View>
         ) : null}
 
@@ -308,16 +312,58 @@ const styles = StyleSheet.create({
   timerDot: { width: 6, height: 6, borderRadius: 3 },
   timerCategory: { color: '#6F6253', fontSize: 9, fontWeight: '800' },
   timerText: { color: '#342C25', fontSize: 18, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  deskPage: { position: 'absolute', left: '27%', top: '42%', width: '27%', height: '13%', paddingHorizontal: 8, paddingTop: 9, overflow: 'hidden', backgroundColor: '#F4ECDD', transform: [{ rotate: '-5deg' }] },
-  openingPage: { transform: [{ rotate: '-8deg' }, { scaleX: 0.94 }] },
-  writingLine: { height: 1, marginBottom: 5, backgroundColor: 'transparent' },
-  writingLineFilled: { backgroundColor: '#738193' },
-  pen: { position: 'absolute', top: '54%', width: 25, height: 2, borderRadius: 2, backgroundColor: '#4D5660', transform: [{ rotate: '-34deg' }] },
-  writingSound: { position: 'absolute', left: '29%', top: '56%', color: '#665746', fontSize: 9, fontWeight: '700', fontStyle: 'italic' },
-  createdBook: { position: 'absolute', left: '38%', top: '39%', width: 82, height: 124, padding: 9, borderRadius: 4, shadowColor: '#2B251F', shadowOpacity: 0.28, shadowRadius: 10, elevation: 7 },
-  bookTopBand: { height: 8, marginTop: 10, backgroundColor: 'rgba(255,255,255,0.55)' },
-  createdBookTitle: { marginTop: 12, color: '#FFFFFF', fontSize: 9, fontWeight: '900' },
-  createdBookMeta: { position: 'absolute', left: 8, bottom: 10, color: 'rgba(255,255,255,0.8)', fontSize: 6 },
+  deskPage: {
+    position: 'absolute',
+    left: '25.5%',
+    top: '45%',
+    width: '30%',
+    height: '12.5%',
+    paddingLeft: 14,
+    paddingRight: 9,
+    paddingTop: 11,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#D4C6B3',
+    borderRadius: 5,
+    backgroundColor: '#F7EFE2',
+    shadowColor: '#382B1E',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 8,
+    transform: [{ rotate: '-9deg' }, { skewX: '-4deg' }],
+  },
+  openingPage: { transform: [{ rotate: '-10deg' }, { skewX: '-5deg' }, { scaleX: 0.96 }] },
+  notebookSpine: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 8, backgroundColor: '#C9B89D' },
+  pageFold: { position: 'absolute', right: -5, top: 0, bottom: 0, width: 18, backgroundColor: 'rgba(219,207,190,0.42)', transform: [{ skewX: '-10deg' }] },
+  writingLine: { height: 1.5, marginBottom: 5, borderRadius: 1, backgroundColor: 'transparent' },
+  writingLineFilled: { backgroundColor: '#66758A' },
+  pen: { position: 'absolute', top: '57%', width: 28, height: 3, borderRadius: 2, backgroundColor: '#4D5660', transform: [{ rotate: '-34deg' }] },
+  writingSound: { position: 'absolute', left: '29%', top: '59%', color: '#665746', fontSize: 9, fontWeight: '700', fontStyle: 'italic' },
+  createdBook: {
+    position: 'absolute',
+    left: '31%',
+    top: '44%',
+    width: 104,
+    height: 68,
+    paddingVertical: 8,
+    paddingLeft: 18,
+    paddingRight: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(73,57,43,0.2)',
+    shadowColor: '#2B251F',
+    shadowOffset: { width: 0, height: 7 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 9,
+    transform: [{ rotate: '-8deg' }],
+  },
+  bookPageBlock: { position: 'absolute', right: 0, top: 7, bottom: 7, width: 10, borderTopRightRadius: 5, borderBottomRightRadius: 5, backgroundColor: 'rgba(255,246,226,0.88)' },
+  bookSpine: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 12, borderTopLeftRadius: 6, borderBottomLeftRadius: 6, backgroundColor: 'rgba(61,44,34,0.25)' },
+  bookTopBand: { height: 7, width: '72%', marginTop: 5, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.5)' },
+  createdBookTitle: { marginTop: 9, color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
+  createdBookMeta: { position: 'absolute', left: 18, bottom: 8, color: 'rgba(255,255,255,0.82)', fontSize: 7, fontWeight: '800' },
   celebration: { position: 'absolute', left: 20, right: 20, bottom: 20, minHeight: 176, padding: 16, borderRadius: 21, backgroundColor: 'rgba(246,239,226,0.91)', shadowColor: '#2F271F', shadowOpacity: 0.2, shadowRadius: 13, elevation: 9 },
   celebrationRule: { width: 34, height: 2, marginBottom: 11, backgroundColor: '#82906A' },
   celebrationKicker: { color: '#7C8764', fontSize: 10, fontWeight: '900' },

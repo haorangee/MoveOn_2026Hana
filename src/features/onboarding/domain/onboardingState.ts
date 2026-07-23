@@ -38,7 +38,7 @@ export const defaultOnboardingState: OnboardingState = {
   nickname: '',
   birthDate: '',
   selectedPetSpecies: 'dog',
-  petName: '마루',
+  petName: '',
   selectedCharacterId: 'daily',
   selectedChapter: 'general',
   magazineNotificationEnabled: null,
@@ -73,7 +73,7 @@ export function normalizeOnboardingState(value: unknown): OnboardingState {
       : 'dog',
     petName: typeof state.petName === 'string' && state.petName.trim()
       ? state.petName.slice(0, 10)
-      : '마루',
+      : '',
     selectedCharacterId: characterIds.includes(state.selectedCharacterId as CharacterId)
       ? state.selectedCharacterId as CharacterId
       : 'daily',

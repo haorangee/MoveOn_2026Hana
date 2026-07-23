@@ -24,7 +24,7 @@ type AuthMode = 'sign-in' | 'sign-up';
 
 export function LoginScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { signInAnonymously, user } = useAuth();
   const { authenticate } = usePhonePasswordAuth();
   const {
     isLoading: isKakaoLoading,
@@ -84,6 +84,22 @@ export function LoginScreen() {
       setErrorMessage(error instanceof Error
         ? error.message
         : '카카오 로그인 중 문제가 생겼어요.');
+    }
+  };
+
+  const submitAnonymous = async () => {
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      await signInAnonymously();
+      router.replace('/');
+    } catch (error) {
+      setErrorMessage(error instanceof Error
+        ? error.message
+        : '익명 로그인 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -237,6 +253,21 @@ export function LoginScreen() {
           </View>
 
           <Pressable
+            accessibilityLabel="익명으로 시작하기"
+            accessibilityRole="button"
+            disabled={isSubmitting || isKakaoLoading}
+            onPress={() => void submitAnonymous()}
+            style={({ pressed }) => [
+              styles.anonymousButton,
+              pressed && styles.pressed,
+              (isSubmitting || isKakaoLoading) && styles.disabled,
+            ]}
+          >
+            <Ionicons color="#6F7E58" name="person-circle-outline" size={19} />
+            <Text style={styles.anonymousText}>익명으로 먼저 시작하기</Text>
+          </Pressable>
+
+          <Pressable
             accessibilityLabel="카카오로 계속하기"
             accessibilityRole="button"
             disabled={isSubmitting || isKakaoLoading}
@@ -285,6 +316,8 @@ const styles = StyleSheet.create({
   activeTabText: { color: '#4D4237' },
   kakaoButton: { minHeight: 53, borderRadius: 16, backgroundColor: '#FEE500', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
   kakaoText: { color: '#191919', fontSize: 14, fontWeight: '900' },
+  anonymousButton: { minHeight: 51, marginBottom: 10, borderWidth: 1, borderColor: '#CFDAC0', borderRadius: 16, backgroundColor: '#F8FBF1', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  anonymousText: { color: '#66754F', fontSize: 13, fontWeight: '900' },
   dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 17 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#E7DED2' },
   dividerText: { color: '#9B8F81', fontSize: 9, fontWeight: '700' },

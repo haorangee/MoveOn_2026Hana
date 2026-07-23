@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Platform, Pressable, StyleSheet } from 'react-native';
+import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { getPetOption } from '@/features/onboarding/onboardingData';
 import { useOnboarding } from '@/features/onboarding/OnboardingProvider';
 import type { RoomActivity } from '@/features/home/roomData';
@@ -13,6 +13,7 @@ type PlayerPetProps = {
   activity: RoomActivity;
   isInteracting: boolean;
   sceneSize: SceneSize;
+  bubbleMessage?: string | null;
   companionMood?: CompanionMood;
   onPress?: () => void;
 };
@@ -49,6 +50,7 @@ const clamp = (value: number, min: number, max: number) => Math.max(min, Math.mi
 
 export function PlayerPet({
   activity,
+  bubbleMessage,
   isInteracting,
   sceneSize,
   companionMood = 'idle',
@@ -226,6 +228,22 @@ export function PlayerPet({
         },
       ]}
     >
+      {bubbleMessage ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.bubble,
+            {
+              left: -petSize.width * 0.38,
+              width: petSize.width * 1.76,
+              transform: [{ scaleX: facing }],
+            },
+          ]}
+        >
+          <Text style={styles.bubbleText}>{bubbleMessage}</Text>
+          <View style={styles.bubbleTail} />
+        </View>
+      ) : null}
       <Pressable
         accessibilityLabel={`${profile.petName || pet.name}와 대화하기`}
         accessibilityRole="button"
@@ -248,5 +266,36 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     top: 0,
+  },
+  bubble: {
+    position: 'absolute',
+    bottom: '88%',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255, 252, 245, 0.94)',
+    shadowColor: '#3D3428',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: Platform.OS === 'web' ? 0.1 : 0.14,
+    shadowRadius: 7,
+    elevation: 4,
+  },
+  bubbleTail: {
+    position: 'absolute',
+    left: '50%',
+    bottom: -5,
+    width: 10,
+    height: 10,
+    marginLeft: -5,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 252, 245, 0.94)',
+    transform: [{ rotate: '45deg' }],
+  },
+  bubbleText: {
+    color: '#554A3D',
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 16,
+    textAlign: 'center',
   },
 });

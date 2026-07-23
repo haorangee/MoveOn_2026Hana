@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { CharacterCompanionGroup } from '@/features/home/components/CharacterCompanionGroup';
+import { CleaningLayer } from '@/features/home/components/CleaningLayer';
 import { InteractiveRoomObject } from '@/features/home/components/InteractiveRoomObject';
 import { NewspaperProp } from '@/features/home/components/NewspaperProp';
 import { QuestMemoBoard } from '@/features/home/components/QuestMemoBoard';
@@ -355,6 +356,7 @@ export function RoomScene({
       >
         <RoomBackdrop />
         <RoomAtmosphere weather={weather} />
+        <CleaningLayer disabled={focusedObject !== null} />
         <StudyBookshelfOverlay
           disabled={focusedObject !== null}
           onOpen={() => {
@@ -372,7 +374,7 @@ export function RoomScene({
           sceneSize={sceneSize}
         />
 
-        {roomHotspots.map((object) => (
+        {roomHotspots.filter((object) => object.id !== 'floor').map((object) => (
           <InteractiveRoomObject
             key={object.id}
             disabled={focusedObject !== null}

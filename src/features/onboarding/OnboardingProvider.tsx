@@ -142,9 +142,9 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
       };
     }
 
-    if (!user || !isRegistered) {
+    if (!user) {
       setProfile(initialProfile);
-      setUserId(user?.uid ?? null);
+      setUserId(null);
       setSyncStatus('idle');
       setIsOnboarded(false);
       setIsHydrated(true);
@@ -174,6 +174,18 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
         }
       } catch {
         // 손상된 로컬 캐시는 무시하고 Firebase 프로필 조회를 계속합니다.
+      }
+
+      if (!isRegistered) {
+        if (active) {
+          if (!cachedProfile) {
+            setProfile(initialProfile);
+            setIsOnboarded(false);
+          }
+          setSyncStatus('offline');
+          setIsHydrated(true);
+        }
+        return;
       }
 
       if (active) setSyncStatus('syncing');
@@ -224,12 +236,18 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
       setSyncStatus('syncing');
 
       try {
-        if (!user || !isRegistered) {
-          throw new Error('A registered Firebase user is required to save onboarding.');
+        if (!user) {
+          throw new Error('A Firebase user is required to save onboarding.');
         }
 
         setUserId(user.uid);
         await AsyncStorage.setItem(profileStorageKey(user.uid), JSON.stringify(nextProfile));
+
+        if (!isRegistered) {
+          setSyncStatus('offline');
+          return;
+        }
+
         await saveUserProfile(user.uid, toUserProfile(nextProfile));
         await saveFirebaseUserProfile(nextProfile);
         setSyncStatus('synced');

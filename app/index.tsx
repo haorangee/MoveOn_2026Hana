@@ -5,10 +5,10 @@ import { useOnboarding } from '@/features/onboarding/OnboardingProvider';
 import { theme } from '@/shared/theme';
 
 export default function Index() {
-  const { isReady: isAuthReady, isRegistered } = useAuth();
+  const { isAuthenticated, isReady: isAuthReady, isRegistered } = useAuth();
   const { isHydrated, isOnboarded, syncStatus } = useOnboarding();
 
-  if (!isAuthReady || (isRegistered && (!isHydrated || syncStatus === 'idle'))) {
+  if (!isAuthReady || (isAuthenticated && (!isHydrated || (isRegistered && syncStatus === 'idle')))) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator color={theme.colors.primary} />
@@ -16,7 +16,7 @@ export default function Index() {
     );
   }
 
-  if (!isRegistered) {
+  if (!isAuthenticated) {
     return <Redirect href={'/login' as Href} />;
   }
 
