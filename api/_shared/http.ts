@@ -23,6 +23,6 @@ export function configureCors(request: ApiRequest, response: ApiResponse) {
     response.setHeader('Access-Control-Allow-Origin', origin);
     response.setHeader('Vary', 'Origin');
   }
-  response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
   response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
 }
