@@ -4,16 +4,21 @@ import {
   type OnboardingState,
 } from '@/features/onboarding/domain/onboardingState';
 
-const ONBOARDING_STORAGE_KEY = '@moveon/onboarding/tutorial/v1';
+const ONBOARDING_STORAGE_KEY = '@moveon/onboarding/tutorial/v2';
+
+function storageKey(userId: string) {
+  return `${ONBOARDING_STORAGE_KEY}/${userId}`;
+}
 
 export interface OnboardingRepository {
-  load(): Promise<OnboardingState | null>;
-  save(state: OnboardingState): Promise<void>;
+  load(userId: string): Promise<OnboardingState | null>;
+  save(userId: string, state: OnboardingState): Promise<void>;
+  clear(userId: string): Promise<void>;
 }
 
 export const onboardingRepository: OnboardingRepository = {
-  async load() {
-    const value = await AsyncStorage.getItem(ONBOARDING_STORAGE_KEY);
+  async load(userId) {
+    const value = await AsyncStorage.getItem(storageKey(userId));
     if (!value) return null;
 
     try {
@@ -23,7 +28,11 @@ export const onboardingRepository: OnboardingRepository = {
     }
   },
 
-  async save(state) {
-    await AsyncStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(state));
+  async save(userId, state) {
+    await AsyncStorage.setItem(storageKey(userId), JSON.stringify(state));
+  },
+
+  async clear(userId) {
+    await AsyncStorage.removeItem(storageKey(userId));
   },
 };

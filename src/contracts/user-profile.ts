@@ -11,4 +11,5 @@ export type UserProfile = {
   chapter: ChapterId;
   magazineNotificationEnabled: boolean;
   onboardingCompleted: boolean;
+  onboardingVersion: number;
 };

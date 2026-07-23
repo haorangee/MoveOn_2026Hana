@@ -16,6 +16,7 @@ import {
 import { birthDateFromAge, resolveBirthDate } from '@/features/onboarding/birthDate';
 import type { ChapterId } from '@/features/onboarding/domain/onboardingState';
 import type { CharacterId, PetSpecies } from '@/features/onboarding/onboardingData';
+import { onboardingRepository } from '@/features/onboarding/data/onboardingRepository';
 import {
   deleteUserProfile,
   ensureUserProfileDocument,
@@ -24,6 +25,7 @@ import {
 } from '@/features/onboarding/data/userProfileRepository';
 
 const PROFILE_STORAGE_KEY = '@moveon/profile/v1';
+export const CURRENT_ONBOARDING_VERSION = 2;
 
 function profileStorageKey(userId: string) {
   return `${PROFILE_STORAGE_KEY}/${userId}`;
@@ -97,6 +99,7 @@ function toUserProfile(profile: MoveOnProfile): UserProfile {
     chapter: profile.chapter,
     magazineNotificationEnabled: profile.magazineNotificationEnabled,
     onboardingCompleted: true,
+    onboardingVersion: CURRENT_ONBOARDING_VERSION,
   };
 }
 
