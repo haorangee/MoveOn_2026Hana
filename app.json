@@ -23,7 +23,17 @@
       }
     },
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "output": "single",
+      "name": "MoveOn",
+      "shortName": "MoveOn",
+      "scope": "/",
+      "startUrl": "/",
+      "display": "standalone",
+      "orientation": "portrait",
+      "themeColor": "#F7F3E8",
+      "backgroundColor": "#F7F3E8",
+      "barStyle": "black-translucent"
     }
   }
 }
