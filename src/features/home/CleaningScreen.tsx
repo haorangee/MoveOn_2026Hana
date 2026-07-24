@@ -12,6 +12,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { firebaseAuth } from '@/config/firebaseAuth';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { useOnboarding } from '@/features/onboarding/OnboardingProvider';
 import { createCleaningSession, completeCleaningSession } from '@/features/home/data/cleaningRepository';
@@ -27,7 +28,7 @@ type CleaningPhase = 'before' | 'cleaning' | 'after' | 'result';
 
 export function CleaningScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, signInAnonymously } = useAuth();
   const { profile } = useOnboarding();
   const [phase, setPhase] = useState<CleaningPhase>('before');
   const [beforeImageUri, setBeforeImageUri] = useState<string | null>(null);
@@ -35,10 +36,14 @@ export function CleaningScreen() {
   const [beforeImageUrl, setBeforeImageUrl] = useState<string | null>(null);
   const [afterImageUrl, setAfterImageUrl] = useState<string | null>(null);
   const [cleaningSessionId, setCleaningSessionId] = useState<string | null>(null);
+  const [cleaningUserId, setCleaningUserId] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<string | null>(null);
   const [completedAt, setCompletedAt] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPickingPhoto, setIsPickingPhoto] = useState(false);
   const [permissionRequested, setPermissionRequested] = useState(false);
+  const pickingPhotoRef = useRef(false);
+  const startStateRef = useRef<'idle' | 'submitting' | 'started'>('idle');
   const completionStateRef = useRef<'idle' | 'submitting' | 'completed'>('idle');
   const {
     rewardResult,
@@ -57,30 +62,67 @@ export function CleaningScreen() {
       : '청소 후 모습을 찍어주세요'
   ), [phase]);
 
-  const takePhoto = async () => {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    setPermissionRequested(true);
-    if (!permission.granted) {
-      Alert.alert('카메라 권한이 필요해요', '청소 사진을 찍으려면 카메라 권한을 허용해 주세요.');
-      return;
+  const resolveUserId = async () => {
+    if (user?.uid) return user.uid;
+    if (firebaseAuth.currentUser?.uid) return firebaseAuth.currentUser.uid;
+
+    await signInAnonymously();
+
+    const nextUid = firebaseAuth.currentUser?.uid;
+    if (!nextUid) {
+      throw new Error('Cleaning requires an authenticated Firebase user.');
     }
+    return nextUid;
+  };
 
-    const result = await ImagePicker.launchCameraAsync({
-      cameraType: ImagePicker.CameraType.back,
-      allowsEditing: true,
-      quality: 0.92,
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    });
+  const takePhoto = async () => {
+    if (pickingPhotoRef.current || isSaving) return;
 
-    if (result.canceled) return;
+    pickingPhotoRef.current = true;
+    setIsPickingPhoto(true);
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      setPermissionRequested(true);
+      if (!permission.granted) {
+        Alert.alert('카메라 권한이 필요해요', '청소 사진을 찍으려면 카메라 권한을 허용해 주세요.');
+        return;
+      }
 
-    const asset = result.assets[0];
-    if (!asset?.uri) return;
+      const result = await ImagePicker.launchCameraAsync({
+        cameraType: ImagePicker.CameraType.back,
+        allowsEditing: true,
+        quality: 0.92,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      });
 
-    if (phase === 'before') {
-      setBeforeImageUri(asset.uri);
-    } else if (phase === 'after') {
-      setAfterImageUri(asset.uri);
+      if (result.canceled) return;
+
+      const asset = result.assets?.[0];
+      if (!asset?.uri) {
+        Alert.alert('사진을 불러올 수 없어요', '사진을 다시 촬영해 주세요.');
+        return;
+      }
+
+      if (phase === 'before') {
+        setBeforeImageUri(asset.uri);
+        setBeforeImageUrl(null);
+        setCleaningSessionId(null);
+        setCleaningUserId(null);
+        setStartedAt(null);
+        startStateRef.current = 'idle';
+      } else if (phase === 'after') {
+        setAfterImageUri(asset.uri);
+        setAfterImageUrl(null);
+        setCompletedAt(null);
+      }
+    } catch (error) {
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        console.warn('Failed to pick cleaning photo.', error);
+      }
+      Alert.alert('사진을 가져올 수 없어요', '잠시 후 다시 촬영해 주세요.');
+    } finally {
+      pickingPhotoRef.current = false;
+      setIsPickingPhoto(false);
     }
   };
 
@@ -89,7 +131,9 @@ export function CleaningScreen() {
       setBeforeImageUri(null);
       setBeforeImageUrl(null);
       setCleaningSessionId(null);
+      setCleaningUserId(null);
       setStartedAt(null);
+      startStateRef.current = 'idle';
     } else {
       setAfterImageUri(null);
       setAfterImageUrl(null);
@@ -98,15 +142,23 @@ export function CleaningScreen() {
   };
 
   const startCleaning = async () => {
-    if (!user || !beforeImageUri) return;
+    if (!beforeImageUri || startStateRef.current !== 'idle') return;
+    startStateRef.current = 'submitting';
     setIsSaving(true);
     try {
-      const record = await createCleaningSession(user.uid, beforeImageUri);
+      const userId = await resolveUserId();
+      const record = await createCleaningSession(userId, beforeImageUri);
       setCleaningSessionId(record.cleaningSessionId);
+      setCleaningUserId(userId);
       setBeforeImageUrl(record.beforeImageUrl);
       setStartedAt(new Date().toISOString());
+      startStateRef.current = 'started';
       setPhase('cleaning');
     } catch (error) {
+      startStateRef.current = 'idle';
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        console.warn('Failed to start cleaning session.', error);
+      }
       Alert.alert('청소를 시작할 수 없어요', '비포 사진 저장에 실패했습니다. 다시 시도해 주세요.');
     } finally {
       setIsSaving(false);
@@ -114,12 +166,13 @@ export function CleaningScreen() {
   };
 
   const finishCleaning = async () => {
-    if (!user || !cleaningSessionId || !afterImageUri || completionStateRef.current !== 'idle') return;
+    if (!cleaningSessionId || !afterImageUri || completionStateRef.current !== 'idle') return;
     completionStateRef.current = 'submitting';
     setIsSaving(true);
     let didCompleteSession = false;
     try {
-      const { afterImageUrl: url, rewardResult: nextRewardResult } = await completeCleaningSession(user.uid, cleaningSessionId, afterImageUri);
+      const userId = cleaningUserId ?? await resolveUserId();
+      const { afterImageUrl: url, rewardResult: nextRewardResult } = await completeCleaningSession(userId, cleaningSessionId, afterImageUri);
       didCompleteSession = true;
       completionStateRef.current = 'completed';
       setAfterImageUrl(url);
@@ -132,9 +185,12 @@ export function CleaningScreen() {
       }
 
       showRewardResult('cleaning', nextRewardResult);
-    } catch {
+    } catch (error) {
       if (!didCompleteSession) {
         completionStateRef.current = 'idle';
+      }
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        console.warn('Failed to complete cleaning session.', error);
       }
       Alert.alert('청소 완료를 저장할 수 없어요', '애프터 사진 저장에 실패했습니다. 다시 시도해 주세요.');
     } finally {
@@ -193,21 +249,23 @@ export function CleaningScreen() {
           <View style={styles.actions}>
             <Pressable
               accessibilityRole="button"
-              disabled={isSaving}
+              disabled={isSaving || isPickingPhoto}
               onPress={() => void takePhoto()}
               style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}
             >
               <Ionicons name="camera-outline" size={18} color="#5D5145" />
-              <Text style={styles.outlineButtonText}>{beforeImageUri ? '다시 찍기' : '사진 찍기'}</Text>
+              <Text style={styles.outlineButtonText}>
+                {isPickingPhoto ? '불러오는 중' : beforeImageUri ? '다시 찍기' : '사진 찍기'}
+              </Text>
             </Pressable>
 
             <Pressable
               accessibilityRole="button"
-              disabled={!hasBeforePhoto || isSaving}
+              disabled={!hasBeforePhoto || isSaving || isPickingPhoto}
               onPress={() => void startCleaning()}
               style={({ pressed }) => [
                 styles.primaryButton,
-                (!hasBeforePhoto || isSaving) && styles.disabled,
+                (!hasBeforePhoto || isSaving || isPickingPhoto) && styles.disabled,
                 pressed && hasBeforePhoto && styles.pressed,
               ]}
             >
@@ -284,21 +342,23 @@ export function CleaningScreen() {
           <View style={styles.actions}>
             <Pressable
               accessibilityRole="button"
-              disabled={isSaving}
+              disabled={isSaving || isPickingPhoto}
               onPress={() => void takePhoto()}
               style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}
             >
               <Ionicons name="camera-outline" size={18} color="#5D5145" />
-              <Text style={styles.outlineButtonText}>{afterImageUri ? '다시 찍기' : '사진 찍기'}</Text>
+              <Text style={styles.outlineButtonText}>
+                {isPickingPhoto ? '불러오는 중' : afterImageUri ? '다시 찍기' : '사진 찍기'}
+              </Text>
             </Pressable>
 
             <Pressable
               accessibilityRole="button"
-              disabled={!hasAfterPhoto || isSaving}
+              disabled={!hasAfterPhoto || isSaving || isPickingPhoto}
               onPress={() => void finishCleaning()}
               style={({ pressed }) => [
                 styles.primaryButton,
-                (!hasAfterPhoto || isSaving) && styles.disabled,
+                (!hasAfterPhoto || isSaving || isPickingPhoto) && styles.disabled,
                 pressed && hasAfterPhoto && styles.pressed,
               ]}
             >

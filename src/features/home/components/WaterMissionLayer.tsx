@@ -457,8 +457,6 @@ const styles = StyleSheet.create({
     top: '58.2%',
     width: 32,
     height: 42,
-    zIndex: 12,
-    elevation: 12,
     alignItems: 'center',
     justifyContent: 'flex-start',
   },
@@ -491,8 +489,6 @@ const styles = StyleSheet.create({
     top: '57.4%',
     width: 58,
     height: 54,
-    zIndex: 14,
-    elevation: 14,
   },
   drop: {
     position: 'absolute',
