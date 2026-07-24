@@ -1,49 +1,83 @@
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  increment,
+  runTransaction,
+  serverTimestamp,
+} from 'firebase/firestore';
 import { firestore } from '@/config/firebase';
 import { ACHIEVEMENT_DEFINITIONS } from '@/features/achievements/achievementDefinitions';
 import {
-  loadAchievementProgress,
-  saveAchievementProgressList,
+  achievementRef,
+  achievementRewardTransactionRef,
+  loadAchievementRecords,
 } from '@/features/achievements/repositories/achievementRepository';
+import type {
+  AchievementDefinition,
+  AchievementProgress,
+  AchievementRecord,
+  AchievementSummary,
+  AchievementUnlockResult,
+  ProcessAchievementResult,
+} from '@/features/achievements/types/achievement';
 import { calculateCategoryLevelProgress } from '@/features/activity/levels';
-import type { AchievementProgress, AchievementSummary } from '@/features/achievements/types/achievement';
 
 type AchievementSnapshot = {
   totalXp: number;
   grapes: number;
-  studyMinutes: number;
+  studyHours: number;
   maxCategoryLevel: number;
   maxCategoryCompletions: number;
 };
 
-function normalizeNumber(value: unknown) {
-  const numberValue = typeof value === 'number' ? value : Number(value ?? 0);
-  if (!Number.isFinite(numberValue) || Number.isNaN(numberValue)) return 0;
+type AchievementTrigger = {
+  triggerActivityId: string | null;
+  triggerDateKey: string | null;
+};
+
+const EMPTY_ACHIEVEMENT_RESULT: ProcessAchievementResult = {
+  unlockedAchievements: [],
+  achievementGrapesEarned: 0,
+};
+
+function normalizeNumber(value: unknown, fallback = 0) {
+  const numberValue = typeof value === 'number' ? value : Number(value ?? fallback);
+  if (!Number.isFinite(numberValue) || Number.isNaN(numberValue)) return fallback;
   return Math.max(0, Math.floor(numberValue));
 }
 
-async function loadSnapshot(userId: string): Promise<AchievementSnapshot> {
-  const [profileSnap, summarySnap, categorySnap] = await Promise.all([
+function createProgressText(value: number, target: number, suffix = '') {
+  return `${Math.min(value, target)}/${target}${suffix}`;
+}
+
+async function loadAchievementSnapshot(userId: string): Promise<AchievementSnapshot> {
+  const [profileSnap, dailySummarySnap, categoryProgressSnap] = await Promise.all([
     getDoc(doc(firestore, 'users', userId)),
     getDocs(collection(firestore, 'users', userId, 'dailyActivitySummaries')),
     getDocs(collection(firestore, 'users', userId, 'categoryProgress')),
   ]);
 
   const profile = profileSnap.exists()
-    ? (profileSnap.data() as { totalXp?: number; grapes?: number })
-    : undefined;
+    ? (profileSnap.data() as { grapes?: number; totalXp?: number })
+    : null;
+
   let studyMinutes = 0;
-  summarySnap.forEach((snapshot) => {
+  dailySummarySnap.forEach((snapshot) => {
     const data = snapshot.data() as { studyMinutes?: number };
     studyMinutes += normalizeNumber(data.studyMinutes);
   });
 
   let maxCategoryLevel = 1;
   let maxCategoryCompletions = 0;
-  categorySnap.forEach((snapshot) => {
-    const data = snapshot.data() as { xp?: number; level?: number; completionCount?: number };
+  categoryProgressSnap.forEach((snapshot) => {
+    const data = snapshot.data() as { completionCount?: number; level?: number; xp?: number };
     const xp = normalizeNumber(data.xp);
-    const level = typeof data.level === 'number' ? data.level : calculateCategoryLevelProgress(xp).level;
+    const level = typeof data.level === 'number'
+      ? Math.max(1, Math.floor(data.level))
+      : calculateCategoryLevelProgress(xp).level;
+
     maxCategoryLevel = Math.max(maxCategoryLevel, level);
     maxCategoryCompletions = Math.max(maxCategoryCompletions, normalizeNumber(data.completionCount));
   });
@@ -51,110 +85,188 @@ async function loadSnapshot(userId: string): Promise<AchievementSnapshot> {
   return {
     totalXp: normalizeNumber(profile?.totalXp),
     grapes: normalizeNumber(profile?.grapes),
-    studyMinutes,
+    studyHours: Math.floor(studyMinutes / 60),
     maxCategoryLevel,
     maxCategoryCompletions,
   };
 }
 
-function buildProgress(
-  userId: string,
+function progressValueForDefinition(
+  definition: AchievementDefinition,
   snapshot: AchievementSnapshot,
-  definitions = ACHIEVEMENT_DEFINITIONS,
-): AchievementProgress[] {
-  const totalStudyHours = Math.floor(snapshot.studyMinutes / 60);
-  const now = new Date().toISOString();
+) {
+  switch (definition.id) {
+    case 'first_xp':
+    case 'steady_growth':
+      return snapshot.totalXp;
+    case 'study_hours_10':
+    case 'study_hours_50':
+      return snapshot.studyHours;
+    case 'category_master':
+      return snapshot.maxCategoryLevel;
+    case 'completion_streak':
+      return snapshot.maxCategoryCompletions;
+    case 'grape_collector':
+      return snapshot.grapes;
+  }
+}
 
-  return definitions.map((definition) => {
-    let progressValue = 0;
-    let targetValue = 1;
-    let achieved = false;
-    let progressText = '0/1';
+function progressTextForDefinition(
+  definition: AchievementDefinition,
+  progressValue: number,
+) {
+  switch (definition.id) {
+    case 'first_xp':
+    case 'steady_growth':
+      return createProgressText(progressValue, definition.targetValue, ' XP');
+    case 'study_hours_10':
+    case 'study_hours_50':
+      return createProgressText(progressValue, definition.targetValue, 'h');
+    case 'category_master':
+      return `Lv.${progressValue}/Lv.${definition.targetValue}`;
+    case 'completion_streak':
+      return createProgressText(progressValue, definition.targetValue, '회');
+    case 'grape_collector':
+      return createProgressText(progressValue, definition.targetValue);
+  }
+}
 
-    switch (definition.id) {
-      case 'first_xp':
-        progressValue = snapshot.totalXp;
-        targetValue = 50;
-        achieved = snapshot.totalXp >= targetValue;
-        progressText = `${Math.min(progressValue, targetValue)}/${targetValue} XP`;
-        break;
-      case 'steady_growth':
-        progressValue = snapshot.totalXp;
-        targetValue = 300;
-        achieved = snapshot.totalXp >= targetValue;
-        progressText = `${Math.min(progressValue, targetValue)}/${targetValue} XP`;
-        break;
-      case 'study_hours_10':
-        progressValue = totalStudyHours;
-        targetValue = 10;
-        achieved = totalStudyHours >= targetValue;
-        progressText = `${Math.min(progressValue, targetValue)}/${targetValue}h`;
-        break;
-      case 'study_hours_50':
-        progressValue = totalStudyHours;
-        targetValue = 50;
-        achieved = totalStudyHours >= targetValue;
-        progressText = `${Math.min(progressValue, targetValue)}/${targetValue}h`;
-        break;
-      case 'category_master':
-        progressValue = snapshot.maxCategoryLevel;
-        targetValue = 3;
-        achieved = snapshot.maxCategoryLevel >= targetValue;
-        progressText = `Lv.${snapshot.maxCategoryLevel}/Lv.${targetValue}`;
-        break;
-      case 'completion_streak':
-        progressValue = snapshot.maxCategoryCompletions;
-        targetValue = 10;
-        achieved = snapshot.maxCategoryCompletions >= targetValue;
-        progressText = `${Math.min(progressValue, targetValue)}/${targetValue}회`;
-        break;
-      case 'grape_collector':
-        progressValue = snapshot.grapes;
-        targetValue = 100;
-        achieved = snapshot.grapes >= targetValue;
-        progressText = `${Math.min(progressValue, targetValue)}/${targetValue}`;
-        break;
+function buildAchievementProgress(
+  definition: AchievementDefinition,
+  snapshot: AchievementSnapshot,
+  record?: AchievementRecord,
+): AchievementProgress {
+  const progressValue = progressValueForDefinition(definition, snapshot);
+  return {
+    achievementId: definition.id,
+    status: record ? 'earned' : 'locked',
+    progressValue: record ? normalizeNumber(record.progressValue, progressValue) : progressValue,
+    targetValue: definition.targetValue,
+    progressText: progressTextForDefinition(definition, progressValue),
+    earnedAt: record?.earnedAt ?? null,
+  };
+}
+
+function buildAchievementRecord(
+  definition: AchievementDefinition,
+  trigger: AchievementTrigger,
+  progressValue: number,
+): AchievementRecord {
+  const timestamp = serverTimestamp();
+  return {
+    achievementId: definition.id,
+    category: definition.category,
+    title: definition.title,
+    rewardGrapes: definition.rewardGrapes,
+    earnedAt: timestamp,
+    triggerActivityId: trigger.triggerActivityId,
+    triggerDateKey: trigger.triggerDateKey,
+    progressValue,
+    targetValue: definition.targetValue,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
+
+async function unlockAchievementIfNeeded(
+  userId: string,
+  definition: AchievementDefinition,
+  trigger: AchievementTrigger,
+  progressValue: number,
+): Promise<AchievementUnlockResult | null> {
+  const userRef = doc(firestore, 'users', userId);
+  const userAchievementRef = achievementRef(userId, definition.id);
+  const rewardTransactionRef = achievementRewardTransactionRef(userId, definition.id);
+
+  return runTransaction(firestore, async (transaction) => {
+    const [achievementSnap, rewardTransactionSnap] = await Promise.all([
+      transaction.get(userAchievementRef),
+      transaction.get(rewardTransactionRef),
+    ]);
+
+    if (achievementSnap.exists()) {
+      return null;
+    }
+
+    const achievementRecord = buildAchievementRecord(definition, trigger, progressValue);
+
+    if (rewardTransactionSnap.exists()) {
+      transaction.set(userAchievementRef, {
+        ...achievementRecord,
+        earnedAt: rewardTransactionSnap.data().createdAt ?? achievementRecord.earnedAt,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      return null;
+    }
+
+    transaction.set(userAchievementRef, achievementRecord);
+    transaction.set(rewardTransactionRef, {
+      achievementId: definition.id,
+      userId,
+      earnedGrapes: definition.rewardGrapes,
+      createdAt: serverTimestamp(),
+    });
+
+    if (definition.rewardGrapes > 0) {
+      transaction.set(userRef, {
+        grapes: increment(definition.rewardGrapes),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
     }
 
     return {
       achievementId: definition.id,
-      status: achieved ? 'earned' : 'locked',
-      progressValue,
-      targetValue,
-      progressText,
-      earnedAt: achieved ? now : null,
-      updatedAt: now,
+      title: definition.title,
+      rewardGrapes: definition.rewardGrapes,
     };
   });
 }
 
-export async function syncUserAchievements(userId: string) {
-  const snapshot = await loadSnapshot(userId);
-  const progress = buildProgress(userId, snapshot);
-  await saveAchievementProgressList(userId, progress);
-  return progress;
+export async function processAchievementUnlocks(
+  userId: string,
+  trigger: AchievementTrigger,
+): Promise<ProcessAchievementResult> {
+  const snapshot = await loadAchievementSnapshot(userId);
+  const unlockedAchievements: AchievementUnlockResult[] = [];
+
+  for (const definition of ACHIEVEMENT_DEFINITIONS) {
+    const progressValue = progressValueForDefinition(definition, snapshot);
+    if (progressValue < definition.targetValue) continue;
+
+    try {
+      const unlockResult = await unlockAchievementIfNeeded(userId, definition, trigger, progressValue);
+      if (unlockResult) unlockedAchievements.push(unlockResult);
+    } catch (error) {
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        console.warn('Failed to unlock achievement.', definition.id, error);
+      }
+    }
+  }
+
+  return {
+    unlockedAchievements,
+    achievementGrapesEarned: unlockedAchievements.reduce(
+      (total, achievement) => total + achievement.rewardGrapes,
+      0,
+    ),
+  };
 }
 
 export async function loadAchievementSummaries(userId: string): Promise<AchievementSummary[]> {
-  const [progressList] = await Promise.all([
-    loadAchievementProgress(userId),
-    syncUserAchievements(userId),
+  const [snapshot, records] = await Promise.all([
+    loadAchievementSnapshot(userId),
+    loadAchievementRecords(userId),
   ]);
+  const recordLookup = new Map(records.map((record) => [record.achievementId, record]));
 
-  const progressMap = new Map(progressList.map((item) => [item.achievementId, item]));
   return ACHIEVEMENT_DEFINITIONS
-    .map((definition) => {
-      const progress = progressMap.get(definition.id);
-      return {
-        ...definition,
-        achievementId: definition.id,
-        status: progress?.status ?? 'locked',
-        progressValue: progress?.progressValue ?? 0,
-        targetValue: progress?.targetValue ?? 1,
-        progressText: progress?.progressText ?? '0/1',
-        earnedAt: progress?.earnedAt ?? null,
-        updatedAt: progress?.updatedAt ?? null,
-      };
-    })
+    .map((definition) => ({
+      ...definition,
+      ...buildAchievementProgress(definition, snapshot, recordLookup.get(definition.id)),
+    }))
     .sort((left, right) => left.sortOrder - right.sortOrder);
+}
+
+export function emptyAchievementResult(): ProcessAchievementResult {
+  return EMPTY_ACHIEVEMENT_RESULT;
 }

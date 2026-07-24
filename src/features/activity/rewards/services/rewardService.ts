@@ -16,8 +16,11 @@ import {
   CATEGORY_LEVEL_THRESHOLDS,
   TOTAL_LEVEL_THRESHOLDS,
 } from '@/features/activity/levels';
+import {
+  emptyAchievementResult,
+  processAchievementUnlocks,
+} from '@/features/achievements/services/achievementService';
 import { REWARD_REASON } from '@/features/activity/rewards/constants/rewardReason';
-import { syncUserAchievements } from '@/features/achievements/services/achievementService';
 import type {
   CategoryRewardProgress,
   DailyRewardContext,
@@ -117,6 +120,7 @@ function emptyRewardResult(
     newTotalLevel: totalLevel,
     newCategoryXp: categoryXp,
     newCategoryLevel: categoryLevel,
+    ...emptyAchievementResult(),
     totalLevelChange: {
       previousLevel: totalLevel,
       newLevel: totalLevel,
@@ -285,12 +289,30 @@ export async function processActivityReward(activity: ActivityRecord): Promise<P
       newTotalLevel: nextTotalLevel.level,
       newCategoryXp: nextProgress.xp,
       newCategoryLevel: nextProgress.level,
+      ...emptyAchievementResult(),
       totalLevelChange,
       categoryLevelChange,
       reward,
     };
   });
 
-  await syncUserAchievements(activity.userId);
-  return result;
+  if (!result.processed || result.alreadyProcessed) {
+    return result;
+  }
+
+  try {
+    const achievementResult = await processAchievementUnlocks(activity.userId, {
+      triggerActivityId: result.activityId,
+      triggerDateKey: dateKey,
+    });
+    return {
+      ...result,
+      ...achievementResult,
+    };
+  } catch (error) {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      console.warn('Failed to process achievement rewards.', error);
+    }
+    return result;
+  }
 }

@@ -10,17 +10,17 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { firestore } from '@/config/firebase';
-import { calculateCategoryLevelProgress, calculateTotalLevelProgress } from '@/features/activity/levels';
-import type { ActivityCategory } from '@/features/activity/constants/activityCategory';
-import { useAuth } from '@/features/auth/AuthProvider';
 import { loadAchievementSummaries } from '@/features/achievements/services/achievementService';
 import type { AchievementSummary } from '@/features/achievements/types/achievement';
+import { ACTIVITY_CATEGORY, type ActivityCategory } from '@/features/activity/constants/activityCategory';
+import { calculateCategoryLevelProgress, calculateTotalLevelProgress } from '@/features/activity/levels';
+import { useAuth } from '@/features/auth/AuthProvider';
 import { useOnboarding } from '@/features/onboarding/OnboardingProvider';
 
 type CategoryProgressRow = {
-  categoryId: ActivityCategory | string;
+  categoryId: ActivityCategory;
   xp: number;
   level: number;
   completionCount: number;
@@ -33,12 +33,24 @@ type CategoryCard = {
   color: string;
 };
 
+type ProfileStats = {
+  totalXp: number;
+  level: number;
+  grapes: number;
+};
+
 const CATEGORY_CARDS: CategoryCard[] = [
-  { id: 'study', label: '공부', color: '#6288A8' },
-  { id: 'cleaning', label: '청소', color: '#78906B' },
-  { id: 'shower', label: '샤워', color: '#B7A0D8' },
-  { id: 'water', label: '물 마시기', color: '#87B6C8' },
+  { id: ACTIVITY_CATEGORY.STUDY, label: '공부', color: '#6288A8' },
+  { id: ACTIVITY_CATEGORY.CLEANING, label: '청소', color: '#78906B' },
+  { id: ACTIVITY_CATEGORY.SHOWER, label: '샤워', color: '#B7A0D8' },
+  { id: ACTIVITY_CATEGORY.WATER, label: '물 마시기', color: '#87B6C8' },
 ];
+
+function normalizeNumber(value: unknown, fallback = 0) {
+  const numberValue = typeof value === 'number' ? value : Number(value ?? fallback);
+  if (!Number.isFinite(numberValue) || Number.isNaN(numberValue)) return fallback;
+  return Math.max(0, Math.floor(numberValue));
+}
 
 function profileTitle(email?: string | null) {
   if (!email) return '로그인 계정';
@@ -50,87 +62,83 @@ export function SettingsScreen() {
   const { signOut, user } = useAuth();
   const { profile, syncStatus, userId } = useOnboarding();
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [profileStats, setProfileStats] = useState<ProfileStats | null>(null);
   const [categoryProgress, setCategoryProgress] = useState<CategoryProgressRow[]>([]);
-  const [studyMinutes, setStudyMinutes] = useState(0);
   const [achievements, setAchievements] = useState<AchievementSummary[]>([]);
-  const totalLevel = calculateTotalLevelProgress(profile.totalXp ?? 0);
 
   useEffect(() => {
     let active = true;
 
-    async function loadCategoryProgress() {
+    async function loadProfileData() {
       if (!userId) {
-        if (active) setCategoryProgress([]);
-        return;
-      }
-
-      try {
-        const rows = await Promise.all(
-          CATEGORY_CARDS.map(async (category) => {
-            const snapshot = await getDoc(doc(firestore, 'users', userId, 'categoryProgress', category.id));
-            const data = snapshot.exists() ? (snapshot.data() as Partial<CategoryProgressRow>) : null;
-            const xp = Math.max(0, Math.floor(data?.xp ?? 0));
-            const level = calculateCategoryLevelProgress(xp).level;
-            return {
-              categoryId: category.id,
-              xp,
-              level,
-              completionCount: Math.max(0, Math.floor(data?.completionCount ?? 0)),
-              totalGrapes: Math.max(0, Math.floor(data?.totalGrapes ?? 0)),
-            };
-          }),
-        );
-
         if (active) {
-          setCategoryProgress(rows.sort((left, right) => right.xp - left.xp));
+          setProfileStats(null);
+          setCategoryProgress([]);
+          setAchievements([]);
         }
-      } catch {
-        if (active) setCategoryProgress([]);
-      }
-    }
-
-    async function loadStudySummary() {
-      if (!userId) {
-        if (active) setStudyMinutes(0);
         return;
       }
 
       try {
-        const snapshot = await getDocs(collection(firestore, 'users', userId, 'dailyActivitySummaries'));
-        let minutes = 0;
-        snapshot.forEach((docSnap) => {
-          const data = docSnap.data() as { studyMinutes?: number };
-          minutes += Math.max(0, Math.floor(data.studyMinutes ?? 0));
+        const [profileSnapshot, achievementSummary, ...categorySnapshots] = await Promise.all([
+          getDoc(doc(firestore, 'users', userId)),
+          loadAchievementSummaries(userId),
+          ...CATEGORY_CARDS.map((category) => (
+            getDoc(doc(firestore, 'users', userId, 'categoryProgress', category.id))
+          )),
+        ]);
+
+        const remoteProfile = profileSnapshot.exists()
+          ? (profileSnapshot.data() as { grapes?: number; level?: number; totalXp?: number })
+          : null;
+
+        const rows = CATEGORY_CARDS.map((category, index) => {
+          const snapshot = categorySnapshots[index];
+          const data = snapshot?.exists()
+            ? (snapshot.data() as Partial<CategoryProgressRow>)
+            : null;
+          const xp = normalizeNumber(data?.xp);
+
+          return {
+            categoryId: category.id,
+            xp,
+            level: normalizeNumber(data?.level, calculateCategoryLevelProgress(xp).level),
+            completionCount: normalizeNumber(data?.completionCount),
+            totalGrapes: normalizeNumber(data?.totalGrapes),
+          };
         });
 
-        if (active) setStudyMinutes(minutes);
+        if (active) {
+          setProfileStats({
+            totalXp: normalizeNumber(remoteProfile?.totalXp, profile.totalXp ?? 0),
+            level: Math.max(1, normalizeNumber(remoteProfile?.level, profile.level ?? 1)),
+            grapes: normalizeNumber(remoteProfile?.grapes, profile.grapes ?? 0),
+          });
+          setCategoryProgress(rows.sort((left, right) => right.xp - left.xp));
+          setAchievements(achievementSummary);
+        }
       } catch {
-        if (active) setStudyMinutes(0);
+        if (active) {
+          setProfileStats(null);
+          setCategoryProgress([]);
+          setAchievements([]);
+        }
       }
     }
 
-    async function loadAchievements() {
-      if (!userId) {
-        if (active) setAchievements([]);
-        return;
-      }
-
-      try {
-        const summary = await loadAchievementSummaries(userId);
-        if (active) setAchievements(summary);
-      } catch {
-        if (active) setAchievements([]);
-      }
-    }
-
-    void loadCategoryProgress();
-    void loadStudySummary();
-    void loadAchievements();
+    void loadProfileData();
 
     return () => {
       active = false;
     };
-  }, [userId]);
+  }, [profile.grapes, profile.level, profile.totalXp, userId]);
+
+  const stats = profileStats ?? {
+    totalXp: profile.totalXp ?? 0,
+    level: profile.level ?? 1,
+    grapes: profile.grapes ?? 0,
+  };
+  const totalLevel = calculateTotalLevelProgress(stats.totalXp);
 
   const categorySummary = useMemo(() => {
     return CATEGORY_CARDS.map((category) => {
@@ -186,7 +194,7 @@ export function SettingsScreen() {
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>전체 레벨</Text>
-              <Text style={styles.statValue}>Lv.{profile.level ?? totalLevel.level}</Text>
+              <Text style={styles.statValue}>Lv.{stats.level}</Text>
               <Text style={styles.statSubValue}>
                 {totalLevel.nextLevelRequiredXp === null
                   ? '최고 레벨'
@@ -195,12 +203,12 @@ export function SettingsScreen() {
             </View>
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>경험치</Text>
-              <Text style={styles.statValue}>{profile.totalXp ?? 0}</Text>
+              <Text style={styles.statValue}>{stats.totalXp}</Text>
               <Text style={styles.statSubValue}>누적 XP</Text>
             </View>
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>포도</Text>
-              <Text style={styles.statValue}>{profile.grapes ?? 0}</Text>
+              <Text style={styles.statValue}>{stats.grapes}</Text>
               <Text style={styles.statSubValue}>보유 개수</Text>
             </View>
           </View>
@@ -246,43 +254,18 @@ export function SettingsScreen() {
                     size={16}
                   />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.achievementTitle}>
-                    {achievement.achievementId === 'first_xp'
-                      ? '첫 성장'
-                      : achievement.achievementId === 'steady_growth'
-                        ? '꾸준한 성장'
-                        : achievement.achievementId === 'study_hours_10'
-                          ? '10시간 공부'
-                          : achievement.achievementId === 'study_hours_50'
-                            ? '50시간 공부'
-                            : achievement.achievementId === 'category_master'
-                              ? '카테고리 마스터'
-                              : achievement.achievementId === 'completion_streak'
-                                ? '반복의 힘'
-                                : '포도 수집가'}
-                  </Text>
-                  <Text style={styles.achievementDescription}>
-                    {achievement.achievementId === 'first_xp'
-                      ? '처음으로 경험치를 쌓았어요.'
-                      : achievement.achievementId === 'steady_growth'
-                        ? '누적 경험치 300을 달성했어요.'
-                        : achievement.achievementId === 'study_hours_10'
-                          ? '공부 시간이 10시간을 넘었어요.'
-                          : achievement.achievementId === 'study_hours_50'
-                            ? '공부 시간이 50시간을 넘었어요.'
-                            : achievement.achievementId === 'category_master'
-                              ? '한 카테고리 레벨 3을 달성했어요.'
-                              : achievement.achievementId === 'completion_streak'
-                                ? '같은 카테고리를 10회 이상 완료했어요.'
-                                : '포도 100개를 모았어요.'}
-                  </Text>
+                <View style={styles.achievementCopy}>
+                  <Text style={styles.achievementTitle}>{achievement.title}</Text>
+                  <Text style={styles.achievementDescription}>{achievement.description}</Text>
                 </View>
                 <Text style={styles.achievementStatus}>
                   {achievement.status === 'earned' ? '달성' : '진행 중'}
                 </Text>
               </View>
-              <Text style={styles.achievementProgress}>{achievement.progressText}</Text>
+              <View style={styles.achievementFooter}>
+                <Text style={styles.achievementProgress}>{achievement.progressText}</Text>
+                <Text style={styles.achievementReward}>보상 포도 +{achievement.rewardGrapes}</Text>
+              </View>
             </View>
           ))}
         </View>
@@ -385,8 +368,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: '#D9CFBF',
   },
-  kicker: { color: '#85906C', fontSize: 9, fontWeight: '900', letterSpacing: 1.1 },
-  profileName: { marginTop: 8, color: '#3B322A', fontSize: 25, fontWeight: '900', letterSpacing: -0.7 },
+  kicker: { color: '#85906C', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
+  profileName: { marginTop: 8, color: '#3B322A', fontSize: 25, fontWeight: '900' },
   profileMeta: { marginTop: 7, color: '#887A6A', fontSize: 10 },
   statsRow: {
     marginTop: 18,
@@ -498,6 +481,9 @@ const styles = StyleSheet.create({
   achievementIconInactive: {
     backgroundColor: '#F1E8DB',
   },
+  achievementCopy: {
+    flex: 1,
+  },
   achievementTitle: {
     color: '#40362D',
     fontSize: 13,
@@ -514,10 +500,21 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   achievementProgress: {
-    marginTop: 8,
     color: '#6C5E50',
     fontSize: 10,
     fontWeight: '700',
+  },
+  achievementFooter: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  achievementReward: {
+    color: '#8A6A3E',
+    fontSize: 10,
+    fontWeight: '800',
   },
   row: {
     minHeight: 84,
@@ -530,7 +527,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  rowIcon: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E9EDDD' },
+  rowIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E9EDDD',
+  },
   rowCopy: { flex: 1, paddingHorizontal: 12 },
   rowTitle: { color: '#40362D', fontSize: 13, fontWeight: '900' },
   rowDescription: { marginTop: 5, color: '#897C6D', fontSize: 9, lineHeight: 14 },

@@ -1,4 +1,5 @@
 import type { ActivityCategory } from '@/features/activity/constants/activityCategory';
+import type { AchievementUnlockResult } from '@/features/achievements/types/achievement';
 import type { RewardReason } from '@/features/activity/rewards/constants/rewardReason';
 
 export interface RewardBreakdown {
@@ -32,6 +33,8 @@ export interface ProcessActivityRewardResult {
   newTotalLevel: number;
   newCategoryXp: number;
   newCategoryLevel: number;
+  unlockedAchievements: AchievementUnlockResult[];
+  achievementGrapesEarned: number;
   totalLevelChange: import('@/features/activity/levels/types/level').LevelChange;
   categoryLevelChange: import('@/features/activity/levels/types/level').LevelChange;
   reward: ActivityRewardResult;
