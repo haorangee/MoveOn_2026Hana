@@ -1,13 +1,17 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 type QuestMemoBoardProps = {
+  cleaningCompleted?: boolean;
   waterCompleted?: boolean;
 };
 
-export function QuestMemoBoard({ waterCompleted = false }: QuestMemoBoardProps) {
+export function QuestMemoBoard({
+  cleaningCompleted = false,
+  waterCompleted = false,
+}: QuestMemoBoardProps) {
   const quests = [
     { title: '샤워하기', done: true, color: '#E8C99D' },
-    { title: '방 청소하기', done: false, color: '#D8DFAF' },
+    { title: '방 청소하기', done: cleaningCompleted, color: '#D8DFAF' },
     { title: '물 마시기', done: waterCompleted, color: '#D7C3A7' },
   ];
 

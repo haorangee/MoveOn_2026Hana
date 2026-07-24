@@ -1,8 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,14 +14,13 @@ import {
 } from 'react-native';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { useOnboarding } from '@/features/onboarding/OnboardingProvider';
-import { createCleaningSession, completeCleaningSession } from '@/features/home/data/cleaningRepository';
+import { markCleaningVerificationPending } from '@/features/home/cleaningMission';
 import { Card } from '@/shared/components/Card';
 import { Screen } from '@/shared/components/Screen';
 import { Body, Heading, Muted, Title } from '@/shared/components/Typography';
 import { theme } from '@/shared/theme';
 
 type CleaningPhase = 'before' | 'cleaning' | 'after' | 'result';
-const CLEANING_STORAGE_KEY = '@moveon/room-cleaning/v1';
 
 export function CleaningScreen() {
   const router = useRouter();
@@ -92,9 +90,9 @@ export function CleaningScreen() {
     if (!user || !beforeImageUri) return;
     setIsSaving(true);
     try {
-      const record = await createCleaningSession(user.uid, beforeImageUri);
-      setCleaningSessionId(record.cleaningSessionId);
-      setBeforeImageUrl(record.beforeImageUrl);
+      const localSessionId = `local-cleaning-${Date.now()}`;
+      setCleaningSessionId(localSessionId);
+      setBeforeImageUrl(beforeImageUri);
       setStartedAt(new Date().toISOString());
       setPhase('cleaning');
     } catch (error) {
@@ -108,11 +106,10 @@ export function CleaningScreen() {
     if (!user || !cleaningSessionId || !afterImageUri) return;
     setIsSaving(true);
     try {
-      const url = await completeCleaningSession(user.uid, cleaningSessionId, afterImageUri);
-      setAfterImageUrl(url);
+      setAfterImageUrl(afterImageUri);
       setCompletedAt(new Date().toISOString());
-      await AsyncStorage.setItem(CLEANING_STORAGE_KEY, String(Date.now()));
-      setPhase('result');
+      await markCleaningVerificationPending();
+      router.replace('/' as Href);
     } catch {
       Alert.alert('청소 완료를 저장할 수 없어요', '애프터 사진 저장에 실패했습니다. 다시 시도해 주세요.');
     } finally {
