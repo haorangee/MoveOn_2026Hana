@@ -1,9 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { type Href, useRouter } from 'expo-router';
+import { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,6 +15,7 @@ import {
 import { useAuth } from '@/features/auth/AuthProvider';
 import { useOnboarding } from '@/features/onboarding/OnboardingProvider';
 import { createCleaningSession, completeCleaningSession } from '@/features/home/data/cleaningRepository';
+import { markCleaningVerificationPending } from '@/features/home/cleaningMission';
 import { ActivityRewardModal } from '@/features/activity/rewards/components/ActivityRewardModal';
 import { useActivityRewardModal } from '@/features/activity/rewards/hooks/useActivityRewardModal';
 import { Card } from '@/shared/components/Card';
@@ -24,7 +24,6 @@ import { Body, Heading, Muted, Title } from '@/shared/components/Typography';
 import { theme } from '@/shared/theme';
 
 type CleaningPhase = 'before' | 'cleaning' | 'after' | 'result';
-const CLEANING_STORAGE_KEY = '@moveon/room-cleaning/v1';
 
 export function CleaningScreen() {
   const router = useRouter();
@@ -40,6 +39,7 @@ export function CleaningScreen() {
   const [completedAt, setCompletedAt] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [permissionRequested, setPermissionRequested] = useState(false);
+  const completionStateRef = useRef<'idle' | 'submitting' | 'completed'>('idle');
   const {
     rewardResult,
     rewardModalVisible,
@@ -114,15 +114,28 @@ export function CleaningScreen() {
   };
 
   const finishCleaning = async () => {
-    if (!user || !cleaningSessionId || !afterImageUri) return;
+    if (!user || !cleaningSessionId || !afterImageUri || completionStateRef.current !== 'idle') return;
+    completionStateRef.current = 'submitting';
     setIsSaving(true);
+    let didCompleteSession = false;
     try {
       const { afterImageUrl: url, rewardResult: nextRewardResult } = await completeCleaningSession(user.uid, cleaningSessionId, afterImageUri);
+      didCompleteSession = true;
+      completionStateRef.current = 'completed';
       setAfterImageUrl(url);
       setCompletedAt(new Date().toISOString());
-      await AsyncStorage.setItem(CLEANING_STORAGE_KEY, String(Date.now()));
+      await markCleaningVerificationPending();
+
+      if (nextRewardResult?.alreadyProcessed === true) {
+        router.replace('/' as Href);
+        return;
+      }
+
       showRewardResult('cleaning', nextRewardResult);
     } catch {
+      if (!didCompleteSession) {
+        completionStateRef.current = 'idle';
+      }
       Alert.alert('청소 완료를 저장할 수 없어요', '애프터 사진 저장에 실패했습니다. 다시 시도해 주세요.');
     } finally {
       setIsSaving(false);
@@ -131,7 +144,7 @@ export function CleaningScreen() {
 
   const confirmReward = () => {
     clearRewardResult();
-    setPhase('result');
+    router.replace('/' as Href);
   };
 
   const goHome = () => {

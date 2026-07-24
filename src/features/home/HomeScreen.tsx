@@ -36,10 +36,15 @@ export function HomeScreen() {
     router.push('/settings' as Href);
   };
 
+  const handleCleaningVerificationPress = () => {
+    router.push('/cleaning' as Href);
+  };
+
   return (
     <View style={styles.container}>
       <RoomScene
         focusedObject={focusedObject}
+        onCleaningVerificationPress={handleCleaningVerificationPress}
         onObjectPress={handleObjectPress}
         onSettingsPress={handleSettingsPress}
         systemMessage={systemMessage}

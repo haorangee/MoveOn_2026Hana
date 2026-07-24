@@ -24,11 +24,17 @@ import {
 import { RoomBackdrop } from '@/features/home/components/RoomBackdrop';
 import { StudyBookshelfOverlay } from '@/features/home/components/StudyBookshelfOverlay';
 import { TopGameStatus } from '@/features/home/components/TopGameStatus';
+import { WaterMissionLayer } from '@/features/home/components/WaterMissionLayer';
 import {
   roomHotspots,
   type RoomActivity,
   type RoomHotspot,
 } from '@/features/home/roomData';
+import {
+  createEmptyCleaningMissionState,
+  type CleaningMissionState,
+} from '@/features/home/cleaningMission';
+import { createEmptyWaterMissionState, type WaterMissionState } from '@/features/home/waterMission';
 
 const lifestyleRoute: RoomActivity[] = [
   'window',
@@ -63,6 +69,7 @@ type RoomSceneProps = {
   focusedObject: RoomHotspot | null;
   systemMessage?: string | null;
   onObjectPress: (object: RoomHotspot) => void;
+  onCleaningVerificationPress: () => void;
   onSettingsPress: () => void;
 };
 
@@ -70,6 +77,7 @@ export function RoomScene({
   focusedObject,
   systemMessage,
   onObjectPress,
+  onCleaningVerificationPress,
   onSettingsPress,
 }: RoomSceneProps) {
   const initialActivity = useMemo(
@@ -79,6 +87,12 @@ export function RoomScene({
   const [activity, setActivity] = useState<RoomActivity>(initialActivity);
   const [sceneSize, setSceneSize] = useState({ width: 0, height: 0 });
   const [weather, setWeather] = useState<RoomWeather>(() => getInitialMockWeather());
+  const [cleaningMissionState, setCleaningMissionState] = useState<CleaningMissionState>(() => (
+    createEmptyCleaningMissionState()
+  ));
+  const [waterMissionState, setWaterMissionState] = useState<WaterMissionState>(() => (
+    createEmptyWaterMissionState()
+  ));
   const cameraScale = useRef(new Animated.Value(1)).current;
   const cameraX = useRef(new Animated.Value(0)).current;
   const cameraY = useRef(new Animated.Value(0)).current;
@@ -356,7 +370,15 @@ export function RoomScene({
       >
         <RoomBackdrop />
         <RoomAtmosphere weather={weather} />
-        <CleaningLayer disabled={focusedObject !== null} />
+        <CleaningLayer
+          disabled={focusedObject !== null}
+          onMissionStateChange={setCleaningMissionState}
+          onStartPhotoVerification={onCleaningVerificationPress}
+        />
+        <WaterMissionLayer
+          disabled={focusedObject !== null}
+          onMissionStateChange={setWaterMissionState}
+        />
         <StudyBookshelfOverlay
           disabled={focusedObject !== null}
           onOpen={() => {
@@ -365,7 +387,10 @@ export function RoomScene({
           }}
           openingProgress={bookshelfOpenProgress}
         />
-        <QuestMemoBoard />
+        <QuestMemoBoard
+          cleaningCompleted={cleaningMissionState.missionCompleted}
+          waterCompleted={waterMissionState.missionCompleted}
+        />
         <NewspaperProp />
 
         <CharacterCompanionGroup

@@ -24,8 +24,8 @@ export const REWARD_POLICY = {
   },
   water: {
     xpPerCup: 1,
-    dailyXpCupLimit: 8,
-    dailyGoalCupCount: 8,
+    dailyXpCupLimit: 5,
+    dailyGoalCupCount: 5,
     goalBonusXp: 2,
     goalBonusGrapes: 2,
   },

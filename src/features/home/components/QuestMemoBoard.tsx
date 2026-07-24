@@ -1,14 +1,22 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-const quests = [
-  { title: '샤워하기', done: true, color: '#E8C99D' },
-  { title: '방 청소하기', done: false, color: '#D8DFAF' },
-  { title: '물 마시기', done: false, color: '#D7C3A7' },
-];
+type QuestMemoBoardProps = {
+  cleaningCompleted?: boolean;
+  waterCompleted?: boolean;
+};
 
-export function QuestMemoBoard() {
+export function QuestMemoBoard({
+  cleaningCompleted = false,
+  waterCompleted = false,
+}: QuestMemoBoardProps) {
+  const quests = [
+    { title: '샤워하기', done: true, color: '#E8C99D' },
+    { title: '방 청소하기', done: cleaningCompleted, color: '#D8DFAF' },
+    { title: '물 마시기', done: waterCompleted, color: '#D7C3A7' },
+  ];
+
   return (
-    <View accessibilityLabel="벽에 붙은 오늘의 퀘스트 메모" pointerEvents="none" style={styles.board}>
+    <View accessibilityLabel="벽에 붙은 오늘의 할 일 메모" pointerEvents="none" style={styles.board}>
       <View style={styles.boardGrain} />
       <View style={[styles.pin, styles.leftPin]} />
       <View style={[styles.pin, styles.rightPin]} />
