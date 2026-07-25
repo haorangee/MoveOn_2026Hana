@@ -91,7 +91,7 @@ export default function IsometricRoomPreviewScreen() {
         </Pressable>
         <View style={styles.headerCopy}>
           <Text style={styles.title}>MoveOn Room Preview</Text>
-          <Text style={styles.subtitle}>아이소메트릭 원룸 배치 확인용</Text>
+          <Text numberOfLines={1} style={styles.subtitle}>이미지 기반 원룸 배치 확인용</Text>
         </View>
         <Pressable
           accessibilityLabel="터치 영역 디버그 표시 전환"
@@ -140,9 +140,11 @@ export default function IsometricRoomPreviewScreen() {
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>방 안의 물건을 눌러 기능 연결을 확인해 보세요.</Text>
-        <Text style={styles.footerMeta}>
-          {ROOM_DESIGN_WIDTH}×{ROOM_DESIGN_HEIGHT} canvas · scale {sceneScale.toFixed(2)}
-        </Text>
+        {__DEV__ ? (
+          <Text style={styles.footerMeta}>
+            {ROOM_DESIGN_WIDTH}×{ROOM_DESIGN_HEIGHT} canvas · scale {sceneScale.toFixed(2)}
+          </Text>
+        ) : null}
       </View>
 
       <Modal
@@ -199,9 +201,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F2E8',
   },
   header: {
-    paddingHorizontal: 18,
-    paddingTop: 6,
-    paddingBottom: 12,
+    paddingHorizontal: 16,
+    paddingTop: 2,
+    paddingBottom: 6,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -224,13 +226,13 @@ const styles = StyleSheet.create({
   },
   title: {
     color: '#392F28',
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '900',
   },
   subtitle: {
-    marginTop: 3,
+    marginTop: 2,
     color: '#817066',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
   debugToggle: {
@@ -257,14 +259,16 @@ const styles = StyleSheet.create({
     color: '#3E648F',
   },
   previewArea: {
-    flex: 1,
-    marginHorizontal: 12,
-    marginBottom: 8,
-    borderRadius: 30,
-    overflow: 'hidden',
+    height: '60%',
+    minHeight: 330,
+    maxHeight: 520,
+    marginHorizontal: 8,
+    marginTop: 2,
+    marginBottom: 4,
+    overflow: 'visible',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F9FCFF',
+    backgroundColor: 'transparent',
   },
   scaledSceneFrame: {
     alignItems: 'center',
@@ -277,8 +281,8 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 24,
-    paddingTop: 10,
-    paddingBottom: 18,
+    paddingTop: 6,
+    paddingBottom: 12,
     alignItems: 'center',
   },
   footerText: {

@@ -3,6 +3,8 @@ import type { IsometricRoomObjectLayout } from '../types/isometricRoom';
 export const ROOM_DESIGN_WIDTH = 768;
 export const ROOM_DESIGN_HEIGHT = 620;
 
+// Temporary hotspot positions for the image-based room preview.
+// Final coordinates should be tuned after assets/images/isometric-room/moveon-room-v1.png is added.
 export const isometricRoomObjects: IsometricRoomObjectLayout[] = [
   {
     id: 'bed',
