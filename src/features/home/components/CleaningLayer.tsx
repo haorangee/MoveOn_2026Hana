@@ -302,7 +302,7 @@ export function CleaningLayer({
           accessibilityLabel="방 청소 빗자루"
           accessibilityRole="button"
           disabled={!canPressBroom}
-          hitSlop={18}
+          hitSlop={4}
           onPress={() => setShowConfirm(true)}
           style={({ pressed }) => [
             styles.broomTouchArea,
@@ -463,25 +463,23 @@ const styles = StyleSheet.create({
   },
   broomStage: {
     position: 'absolute',
-    right: '3%',
-    top: '58%',
-    width: 50,
-    height: 100,
-    zIndex: 18,
-    elevation: 18,
+    left: '10%',
+    top: '57.5%',
+    width: 42,
+    height: 84,
+    zIndex: 8,
+    elevation: 8,
   },
   broomTouchArea: {
-    position: 'absolute',
-    left: '-36%',
-    top: '-14%',
-    right: '-28%',
-    bottom: '-12%',
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
   broomImage: {
     width: '100%',
-    height: '100%',
+    height: '120%',
+    transform: [{ rotate: '-18deg' }],
   },
   pressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
   disabled: { opacity: 0.58 },

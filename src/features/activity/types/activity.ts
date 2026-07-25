@@ -22,6 +22,10 @@ export type CleaningActivityDetails = {
 
 export type ShowerActivityDetails = {
   showerType?: 'normal' | 'quick';
+  selectedMinutes?: number | null;
+  actualSeconds?: number | null;
+  actualMinutes?: number | null;
+  targetMet?: boolean | null;
   memo?: string | null;
 };
 

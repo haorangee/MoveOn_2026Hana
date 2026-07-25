@@ -93,6 +93,7 @@ export function RoomScene({
   const [waterMissionState, setWaterMissionState] = useState<WaterMissionState>(() => (
     createEmptyWaterMissionState()
   ));
+  const [waterOpenRequest, setWaterOpenRequest] = useState(0);
   const cameraScale = useRef(new Animated.Value(1)).current;
   const cameraX = useRef(new Animated.Value(0)).current;
   const cameraY = useRef(new Animated.Value(0)).current;
@@ -347,6 +348,20 @@ export function RoomScene({
     ));
   };
 
+  const handleWaterMissionOpen = () => {
+    const plant = roomHotspots.find((object) => object.id === 'plant');
+    if (plant) onObjectPress(plant);
+  };
+
+  const handleRoomObjectPress = (object: RoomHotspot) => {
+    if (object.id === 'plant') {
+      setWaterOpenRequest((current) => current + 1);
+      return;
+    }
+
+    onObjectPress(object);
+  };
+
   const feedback = focusedObject?.feedback ?? systemMessage;
 
   return (
@@ -377,6 +392,8 @@ export function RoomScene({
         />
         <WaterMissionLayer
           disabled={focusedObject !== null}
+          openRequest={waterOpenRequest}
+          onWaterMissionOpen={handleWaterMissionOpen}
           onMissionStateChange={setWaterMissionState}
         />
         <StudyBookshelfOverlay
@@ -404,7 +421,7 @@ export function RoomScene({
             key={object.id}
             disabled={focusedObject !== null}
             object={object}
-            onPress={onObjectPress}
+            onPress={handleRoomObjectPress}
           />
         ))}
       </Animated.View>

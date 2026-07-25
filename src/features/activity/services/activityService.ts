@@ -160,11 +160,12 @@ export async function completeShowerActivity(
   details: ShowerActivityDetails = {},
 ): Promise<ProcessActivityRewardResult | null> {
   const record = createBaseRecord(userId, ACTIVITY_CATEGORY.SHOWER, 'app', details);
+  const durationMinutes = Math.max(0, Math.round((details.actualSeconds ?? 0) / 60));
   await createActivityRecord(record);
   await updateActivityRecord(userId, record.activityId, {
     status: ACTIVITY_STATUS.COMPLETED,
     completedAt: new Date(),
-    durationMinutes: 0,
+    durationMinutes,
     details,
   });
   await updateDailySummary(userId, createDateKey(), (current) => {

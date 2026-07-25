@@ -25,6 +25,8 @@ import { useActivityRewardModal } from '@/features/activity/rewards/hooks/useAct
 
 type WaterMissionLayerProps = {
   disabled?: boolean;
+  openRequest?: number;
+  onWaterMissionOpen?: () => void;
   onMissionStateChange?: (state: WaterMissionState) => void;
 };
 
@@ -33,6 +35,8 @@ const CUP_REWARD_MODAL_DELAY_MS = 480;
 
 export function WaterMissionLayer({
   disabled = false,
+  openRequest = 0,
+  onWaterMissionOpen,
   onMissionStateChange,
 }: WaterMissionLayerProps) {
   const { user } = useAuth();
@@ -65,7 +69,9 @@ export function WaterMissionLayer({
     clearRewardResult,
   } = useActivityRewardModal();
 
-  const consumedMl = state.cupCount * WATER_PER_CUP_ML;
+  const safeCupCount = Math.min(state.cupCount, DAILY_WATER_CUP_COUNT);
+  const consumedMl = safeCupCount * WATER_PER_CUP_ML;
+  const waterProgress = safeCupCount / DAILY_WATER_CUP_COUNT;
   const isComplete = state.missionCompleted;
   const canInteract = isHydrated
     && !disabled
@@ -104,7 +110,8 @@ export function WaterMissionLayer({
         }),
       ]).start();
 
-      setFeedback('한 잔 충전했어요!');
+      const nextConsumedMl = Math.min(state.cupCount, DAILY_WATER_CUP_COUNT) * WATER_PER_CUP_ML;
+      setFeedback(`한 잔 충전했어요! 현재 ${nextConsumedMl.toLocaleString()}ml 마셨어요.`);
       if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
       feedbackTimer.current = setTimeout(() => setFeedback(null), 1800);
     }
@@ -271,16 +278,39 @@ export function WaterMissionLayer({
     });
   };
 
+  const openWaterModal = () => {
+    if (!isHydrated || disabled || isBloomAnimating || isSubmittingWaterActivity || rewardModalVisible) return;
+    onWaterMissionOpen?.();
+    setShowModal(true);
+  };
+
+  useEffect(() => {
+    if (openRequest <= 0) return;
+    openWaterModal();
+  // openWaterModal intentionally reads the latest interaction locks.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRequest]);
+
   return (
     <>
       <Pressable
         accessibilityHint="오늘 물 마시기 기록을 엽니다."
-        accessibilityLabel="물 마시기 미션 열기"
+        accessibilityLabel="오른쪽 탁자 물 마시기 미션 열기"
         accessibilityRole="button"
         disabled={!isHydrated || disabled || isBloomAnimating || isSubmittingWaterActivity || rewardModalVisible}
-        hitSlop={10}
-        onPress={() => setShowModal(true)}
-        style={styles.waterHotspot}
+        hitSlop={6}
+        onPress={openWaterModal}
+        style={styles.tableWaterHotspot}
+      />
+
+      <Pressable
+        accessibilityHint="오늘 물 마시기 기록을 엽니다."
+        accessibilityLabel="왼쪽 화분 물 마시기 미션 열기"
+        accessibilityRole="button"
+        disabled={!isHydrated || disabled || isBloomAnimating || isSubmittingWaterActivity || rewardModalVisible}
+        hitSlop={6}
+        onPress={openWaterModal}
+        style={styles.leftPlantWaterHotspot}
       />
 
       <Animated.View pointerEvents="none" style={[styles.flowerStage, plantSwayStyle]}>
@@ -317,6 +347,7 @@ export function WaterMissionLayer({
             {showSuccess || isComplete ? (
               <>
                 <Text style={styles.modalTitle}>미션 성공!!</Text>
+                <Text style={styles.interactionCaption}>잎사귀를 살피며 물을 나눠 주는 중…</Text>
                 <Text style={styles.modalDescription}>
                   오늘 수분이 모두 충전되었어요 💧
                 </Text>
@@ -345,6 +376,7 @@ export function WaterMissionLayer({
             ) : (
               <>
                 <Text style={styles.modalTitle}>오늘의 수분을 충전하세요</Text>
+                <Text style={styles.interactionCaption}>잎사귀를 살피며 물을 나눠 주는 중…</Text>
                 <Text style={styles.modalDescription}>
                   성인의 하루 권장 수분 섭취량은 약 2L예요.
                 </Text>
@@ -353,11 +385,17 @@ export function WaterMissionLayer({
                 </Text>
 
                 <View style={styles.progressPanel}>
+                  <Text style={styles.currentWaterText}>
+                    현재 {consumedMl.toLocaleString()}ml 마셨어요
+                  </Text>
                   <View style={styles.progressHeader}>
-                    <Text style={styles.progressLabel}>현재 진행량</Text>
+                    <Text style={styles.progressLabel}>목표 진행량</Text>
                     <Text style={styles.progressValue}>
-                      {state.cupCount} / {DAILY_WATER_CUP_COUNT}컵 · {consumedMl.toLocaleString()}ml
+                      {safeCupCount} / {DAILY_WATER_CUP_COUNT}잔 · {consumedMl.toLocaleString()}ml / {DAILY_WATER_GOAL_ML.toLocaleString()}ml
                     </Text>
+                  </View>
+                  <View style={styles.progressTrack}>
+                    <View style={[styles.progressFill, { width: `${waterProgress * 100}%` }]} />
                   </View>
                   <View style={styles.cupRow}>
                     {cupIndexes.map((index) => {
@@ -398,7 +436,7 @@ export function WaterMissionLayer({
                     })}
                   </View>
                   <Text style={styles.perCupText}>
-                    한 컵은 {WATER_PER_CUP_ML}ml · 하루 목표 {DAILY_WATER_GOAL_ML.toLocaleString()}ml
+                    한 잔은 {WATER_PER_CUP_ML}ml · 전체 목표 {DAILY_WATER_GOAL_ML.toLocaleString()}ml
                   </Text>
                   {feedback ? <Text style={styles.feedbackText}>{feedback}</Text> : null}
                 </View>
@@ -441,13 +479,23 @@ export function WaterMissionLayer({
 }
 
 const styles = StyleSheet.create({
-  waterHotspot: {
+  tableWaterHotspot: {
     position: 'absolute',
-    right: '6%',
-    top: '61%',
-    width: '22%',
-    height: '14%',
+    right: '9.2%',
+    top: '63.4%',
+    width: '9.8%',
+    height: '6.8%',
     borderRadius: 34,
+    zIndex: 16,
+    elevation: 16,
+  },
+  leftPlantWaterHotspot: {
+    position: 'absolute',
+    left: '1%',
+    top: '69.5%',
+    width: '12.5%',
+    height: '12%',
+    borderRadius: 42,
     zIndex: 16,
     elevation: 16,
   },
@@ -530,6 +578,12 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   modalTitle: { color: '#382F27', fontSize: 20, fontWeight: '900' },
+  interactionCaption: {
+    marginTop: 7,
+    color: '#6D8A5B',
+    fontSize: 12,
+    fontWeight: '900',
+  },
   modalDescription: {
     marginTop: 9,
     color: '#6F6254',
@@ -552,6 +606,12 @@ const styles = StyleSheet.create({
     borderColor: '#EADCC8',
     backgroundColor: '#FFFDF8',
   },
+  currentWaterText: {
+    marginBottom: 10,
+    color: '#3F6978',
+    fontSize: 15,
+    fontWeight: '900',
+  },
   progressHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -560,6 +620,18 @@ const styles = StyleSheet.create({
   },
   progressLabel: { color: '#756757', fontSize: 12, fontWeight: '900' },
   progressValue: { color: '#4E6E7D', fontSize: 12, fontWeight: '900' },
+  progressTrack: {
+    marginTop: 10,
+    height: 10,
+    borderRadius: 999,
+    overflow: 'hidden',
+    backgroundColor: '#E5F2F5',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#78CFE3',
+  },
   successPanel: {
     marginTop: 16,
     padding: 14,
