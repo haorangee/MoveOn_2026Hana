@@ -22,6 +22,12 @@ import { ACTIVITY_CATEGORY } from '@/features/activity/constants/activityCategor
 import { recordWaterActivity } from '@/features/activity/services/activityService';
 import { ActivityRewardModal } from '@/features/activity/rewards/components/ActivityRewardModal';
 import { useActivityRewardModal } from '@/features/activity/rewards/hooks/useActivityRewardModal';
+import {
+  clearPendingWaterQuestIfMatches,
+  isNonRetryableQuestLinkError,
+  linkCompletedActivityToQuest,
+  resolvePendingWaterQuestForLink,
+} from '@/features/quests/services/questActivityLinkService';
 
 type WaterMissionLayerProps = {
   disabled?: boolean;
@@ -199,6 +205,41 @@ export function WaterMissionLayer({
         throw new Error('Water activity reward result is empty.');
       }
       didRecordWaterActivity = true;
+
+      try {
+        const pendingWaterQuest = await resolvePendingWaterQuestForLink(user.uid);
+        if (pendingWaterQuest.questId && pendingWaterQuest.shouldClear) {
+          await clearPendingWaterQuestIfMatches(pendingWaterQuest.questId);
+        } else if (pendingWaterQuest.canLink) {
+          try {
+            await linkCompletedActivityToQuest({
+              questId: pendingWaterQuest.questId,
+              activityId: nextRewardResult.activityId,
+            });
+            await clearPendingWaterQuestIfMatches(pendingWaterQuest.questId);
+          } catch (questLinkError) {
+            if (isNonRetryableQuestLinkError(questLinkError)) {
+              await clearPendingWaterQuestIfMatches(pendingWaterQuest.questId);
+            } else {
+              Alert.alert(
+                '물 기록은 저장됐어요',
+                '다만 퀘스트 완료 표시를 갱신하지 못했어요. 퀘스트 화면에서 상태를 다시 확인해 주세요.',
+              );
+            }
+            if (typeof __DEV__ !== 'undefined' && __DEV__) {
+              console.warn('Failed to link water activity to quest.', questLinkError);
+            }
+          }
+        }
+      } catch (pendingQuestError) {
+        if (typeof __DEV__ !== 'undefined' && __DEV__) {
+          console.warn('Failed to resolve pending water quest.', pendingQuestError);
+        }
+        Alert.alert(
+          '물 기록은 저장됐어요',
+          '다만 퀘스트 완료 표시를 갱신하지 못했어요. 퀘스트 화면에서 상태를 다시 확인해 주세요.',
+        );
+      }
 
       const nextState = await recordCup();
       const reachedGoal = nextState.missionCompleted && !state.missionCompleted;

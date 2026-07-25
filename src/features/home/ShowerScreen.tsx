@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { type Href, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -20,6 +20,10 @@ import { ActivityRewardModal } from '@/features/activity/rewards/components/Acti
 import { useActivityRewardModal } from '@/features/activity/rewards/hooks/useActivityRewardModal';
 import { completeShowerActivity } from '@/features/activity/services/activityService';
 import {
+  getQuestLinkRouteParam,
+  linkCompletedActivityToQuest,
+} from '@/features/quests/services/questActivityLinkService';
+import {
   clearActiveShowerTimer,
   formatTimer,
   getDisplayShowerMinutes,
@@ -38,8 +42,14 @@ const bathroomImage = require('../../../assets/bathroom-shower.png');
 
 type ShowerPhase = 'idle' | 'running' | 'result';
 
+type ShowerRouteParams = {
+  questId?: string | string[];
+  fromQuest?: string | string[];
+};
+
 export function ShowerScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<ShowerRouteParams>();
   const { user } = useAuth();
   const [selectedMinutes, setSelectedMinutes] = useState<ShowerDurationMinutes>(10);
   const [phase, setPhase] = useState<ShowerPhase>('idle');
@@ -59,6 +69,7 @@ export function ShowerScreen() {
   } | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
   const completingRef = useRef(false);
+  const shouldReturnToQuestsRef = useRef(false);
   const wave = useRef(new Animated.Value(0)).current;
   const {
     rewardResult,
@@ -74,6 +85,11 @@ export function ShowerScreen() {
   const targetReached = elapsedSeconds >= selectedSeconds;
   const todaySeconds = record?.totalSeconds ?? 0;
   const todayMinutes = todaySeconds > 0 ? getDisplayShowerMinutes(todaySeconds) : 0;
+  const normalizedQuestId = getQuestLinkRouteParam({
+    questId: params.questId,
+    fromQuest: params.fromQuest,
+  });
+  const fromQuest = normalizedQuestId !== null;
 
   useEffect(() => {
     let mounted = true;
@@ -170,8 +186,27 @@ export function ShowerScreen() {
           targetMet: actualSeconds >= selectedMinutes * 60,
         });
         if (nextRewardResult) {
+          if (normalizedQuestId && nextRewardResult.activityId) {
+            try {
+              await linkCompletedActivityToQuest({
+                questId: normalizedQuestId,
+                activityId: nextRewardResult.activityId,
+              });
+            } catch (questLinkError) {
+              if (typeof __DEV__ !== 'undefined' && __DEV__) {
+                console.warn('Failed to link shower activity to quest.', questLinkError);
+              }
+              if (fromQuest) {
+                Alert.alert(
+                  '샤워 기록은 저장됐어요',
+                  '다만 퀘스트 완료 표시를 갱신하지 못했어요. 퀘스트 화면에서 상태를 다시 확인해 주세요.',
+                );
+              }
+            }
+          }
           const updatedRecord = await markShowerRewardProcessed();
           setRecord(updatedRecord);
+          shouldReturnToQuestsRef.current = fromQuest;
           showRewardResult(ACTIVITY_CATEGORY.SHOWER, nextRewardResult);
         }
       }
@@ -219,6 +254,14 @@ export function ShowerScreen() {
   const closeResult = () => {
     setResult(null);
     setPhase('idle');
+  };
+
+  const confirmReward = () => {
+    clearRewardResult();
+    if (shouldReturnToQuestsRef.current) {
+      shouldReturnToQuestsRef.current = false;
+      router.replace('/quests' as Href);
+    }
   };
 
   const resultSeconds = result?.actualSeconds ?? elapsedSeconds;
@@ -363,7 +406,7 @@ export function ShowerScreen() {
 
       <ActivityRewardModal
         categoryId={rewardCategoryId ?? ACTIVITY_CATEGORY.SHOWER}
-        onConfirm={clearRewardResult}
+        onConfirm={confirmReward}
         result={rewardResult}
         visible={rewardModalVisible}
       />
