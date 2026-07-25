@@ -1,3 +1,4 @@
+import { type Href, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { loadShowerDayRecord } from '@/features/home/showerMission';
@@ -19,6 +20,7 @@ export function QuestMemoBoard({
   cleaningCompleted = false,
   waterCompleted = false,
 }: QuestMemoBoardProps) {
+  const router = useRouter();
   const { books } = useStudyBooks();
   const [showBoard, setShowBoard] = useState(false);
   const [showerCompleted, setShowerCompleted] = useState(false);
@@ -49,6 +51,11 @@ export function QuestMemoBoard({
   const openBoard = () => {
     void refreshShowerStatus();
     setShowBoard(true);
+  };
+
+  const openQuestScreen = () => {
+    setShowBoard(false);
+    router.push('/quests' as Href);
   };
 
   return (
@@ -110,6 +117,14 @@ export function QuestMemoBoard({
                 </View>
               ))}
             </View>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={openQuestScreen}
+              style={({ pressed }) => [styles.questButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.questButtonText}>전체 퀘스트 보러가기</Text>
+            </Pressable>
 
             <Pressable
               accessibilityRole="button"
@@ -292,7 +307,7 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     minHeight: 48,
-    marginTop: 18,
+    marginTop: 10,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
@@ -300,6 +315,21 @@ const styles = StyleSheet.create({
   },
   closeButtonText: {
     color: '#FFF9EE',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  questButton: {
+    minHeight: 48,
+    marginTop: 18,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#D8C7AD',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFF3DE',
+  },
+  questButtonText: {
+    color: '#695848',
     fontSize: 14,
     fontWeight: '900',
   },

@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { type Href, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -19,6 +20,7 @@ import { QuestCard } from '../components/QuestCard';
 import { QuestEmptyState } from '../components/QuestEmptyState';
 import { QuestFormModal } from '../components/QuestFormModal';
 import { useTodayQuests } from '../hooks/useTodayQuests';
+import { savePendingWaterQuestId } from '../services/questActivityLinkService';
 
 type FormState = {
   mode: 'create' | 'edit';
@@ -97,6 +99,12 @@ export default function QuestScreen() {
   }, [quests]);
 
   const isMutating = processingQuestId !== null;
+
+  useFocusEffect(
+    useCallback(() => {
+      void reload({ quiet: true });
+    }, [reload]),
+  );
 
   const openCreateForm = () => {
     setNotice(null);
@@ -177,13 +185,59 @@ export default function QuestScreen() {
     }
   };
 
-  const handleStartActivityQuest = (quest: Quest) => {
+  const handleStartActivityQuest = async (quest: Quest) => {
     if (quest.category === 'custom') {
       void handleCompleteCustomQuest(quest);
       return;
     }
+
+    if (quest.status !== 'pending') return;
+
+    const params = {
+      questId: quest.id,
+      fromQuest: '1',
+    };
+
+    if (quest.category === ACTIVITY_CATEGORY.STUDY) {
+      router.push({
+        pathname: '/study-desk',
+        params,
+      });
+      return;
+    }
+
+    if (quest.category === ACTIVITY_CATEGORY.CLEANING) {
+      router.push({
+        pathname: '/cleaning',
+        params,
+      });
+      return;
+    }
+
+    if (quest.category === ACTIVITY_CATEGORY.SHOWER) {
+      router.push({
+        pathname: '/shower',
+        params,
+      });
+      return;
+    }
+
+    if (quest.category === ACTIVITY_CATEGORY.WATER) {
+      try {
+        await savePendingWaterQuestId(quest.id);
+        setNotice('홈에서 물컵이나 화분을 눌러 물 한 잔을 기록하면 이 퀘스트가 완료돼요.');
+        router.replace('/' as Href);
+      } catch (waterQuestError) {
+        if (typeof __DEV__ !== 'undefined' && __DEV__) {
+          console.warn('Failed to save pending water quest.', waterQuestError);
+        }
+        Alert.alert('물 마시기 퀘스트를 시작할 수 없어요', '잠시 후 다시 시도해 주세요.');
+      }
+      return;
+    }
+
     Alert.alert(
-      '활동 연결 준비 중이에요',
+      '아직 연결되지 않은 활동이에요',
       getCompletionMessage(quest),
       [{ text: '확인' }],
     );

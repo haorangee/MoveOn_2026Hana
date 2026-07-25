@@ -22,6 +22,11 @@ import { ACTIVITY_CATEGORY } from '@/features/activity/constants/activityCategor
 import { recordWaterActivity } from '@/features/activity/services/activityService';
 import { ActivityRewardModal } from '@/features/activity/rewards/components/ActivityRewardModal';
 import { useActivityRewardModal } from '@/features/activity/rewards/hooks/useActivityRewardModal';
+import {
+  clearPendingWaterQuestId,
+  linkCompletedActivityToQuest,
+  loadPendingWaterQuestId,
+} from '@/features/quests/services/questActivityLinkService';
 
 type WaterMissionLayerProps = {
   disabled?: boolean;
@@ -199,6 +204,25 @@ export function WaterMissionLayer({
         throw new Error('Water activity reward result is empty.');
       }
       didRecordWaterActivity = true;
+
+      const pendingWaterQuestId = await loadPendingWaterQuestId();
+      if (pendingWaterQuestId) {
+        try {
+          await linkCompletedActivityToQuest({
+            questId: pendingWaterQuestId,
+            activityId: nextRewardResult.activityId,
+          });
+          await clearPendingWaterQuestId(pendingWaterQuestId);
+        } catch (questLinkError) {
+          if (typeof __DEV__ !== 'undefined' && __DEV__) {
+            console.warn('Failed to link water activity to quest.', questLinkError);
+          }
+          Alert.alert(
+            '물 기록은 저장됐어요',
+            '다만 퀘스트 완료 표시를 갱신하지 못했어요. 퀘스트 화면에서 상태를 다시 확인해 주세요.',
+          );
+        }
+      }
 
       const nextState = await recordCup();
       const reachedGoal = nextState.missionCompleted && !state.missionCompleted;

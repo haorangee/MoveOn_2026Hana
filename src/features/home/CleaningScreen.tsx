@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
-import { type Href, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,10 +13,21 @@ import {
   Text,
   View,
 } from 'react-native';
+import { ACTIVITY_CATEGORY } from '@/features/activity/constants/activityCategory';
 import { useOnboarding } from '@/features/onboarding/OnboardingProvider';
 import { markCleaningVerificationPending } from '@/features/home/cleaningMission';
+import {
+  completeCleaningSession,
+  createCleaningSession,
+} from '@/features/home/data/cleaningRepository';
 import { ActivityRewardModal } from '@/features/activity/rewards/components/ActivityRewardModal';
 import { useActivityRewardModal } from '@/features/activity/rewards/hooks/useActivityRewardModal';
+import {
+  getQuestRouteParam,
+  isFromQuestRoute,
+  linkCompletedActivityToQuest,
+} from '@/features/quests/services/questActivityLinkService';
+import { ensureAnonymousUser } from '@/shared/backend/authRepository';
 import { Card } from '@/shared/components/Card';
 import { Screen } from '@/shared/components/Screen';
 import { Body, Heading, Muted, Title } from '@/shared/components/Typography';
@@ -24,8 +35,14 @@ import { theme } from '@/shared/theme';
 
 type CleaningPhase = 'before' | 'cleaning' | 'after' | 'result';
 
+type CleaningRouteParams = {
+  questId?: string;
+  fromQuest?: string;
+};
+
 export function CleaningScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<CleaningRouteParams>();
   const { profile } = useOnboarding();
   const [phase, setPhase] = useState<CleaningPhase>('before');
   const [beforeImageUri, setBeforeImageUri] = useState<string | null>(null);
@@ -52,6 +69,8 @@ export function CleaningScreen() {
 
   const hasBeforePhoto = Boolean(beforeImageUri);
   const hasAfterPhoto = Boolean(afterImageUri);
+  const questId = getQuestRouteParam(params.questId);
+  const fromQuest = isFromQuestRoute(params.fromQuest);
 
   const cameraLabel = useMemo(() => (
     phase === 'before'
@@ -140,10 +159,11 @@ export function CleaningScreen() {
     startStateRef.current = 'submitting';
     setIsSaving(true);
     try {
-      const localSessionId = `local-cleaning-${Date.now()}`;
-      setCleaningSessionId(localSessionId);
-      setCleaningUserId('local-mvp');
-      setBeforeImageUrl(beforeImageUri);
+      const user = await ensureAnonymousUser();
+      const session = await createCleaningSession(user.uid, beforeImageUri);
+      setCleaningSessionId(session.cleaningSessionId);
+      setCleaningUserId(user.uid);
+      setBeforeImageUrl(session.beforeImageUrl);
       setStartedAt(new Date().toISOString());
       startStateRef.current = 'started';
       setPhase('cleaning');
@@ -159,15 +179,58 @@ export function CleaningScreen() {
   };
 
   const finishCleaning = async () => {
-    if (!cleaningSessionId || !afterImageUri || completionStateRef.current !== 'idle') return;
+    if (!cleaningSessionId || !cleaningUserId || !afterImageUri || completionStateRef.current !== 'idle') return;
     completionStateRef.current = 'submitting';
     setIsSaving(true);
     try {
+      const completion = await completeCleaningSession(
+        cleaningUserId,
+        cleaningSessionId,
+        afterImageUri,
+      );
+      if (!completion.rewardResult) {
+        throw new Error('Cleaning reward result is empty.');
+      }
+
+      try {
+        await linkCompletedActivityToQuest({
+          questId,
+          activityId: completion.rewardResult.activityId,
+        });
+      } catch (questLinkError) {
+        if (typeof __DEV__ !== 'undefined' && __DEV__) {
+          console.warn('Failed to link cleaning activity to quest.', questLinkError);
+        }
+        if (fromQuest) {
+          Alert.alert(
+            '청소 기록은 저장됐어요',
+            '다만 퀘스트 완료 표시를 갱신하지 못했어요. 퀘스트 화면에서 상태를 다시 확인해 주세요.',
+          );
+        }
+      }
+
+      try {
+        await markCleaningVerificationPending();
+      } catch (verificationError) {
+        if (typeof __DEV__ !== 'undefined' && __DEV__) {
+          console.warn('Failed to mark cleaning verification pending.', verificationError);
+        }
+        Alert.alert(
+          '청소 기록은 저장됐어요',
+          '홈의 청소 애니메이션 상태 반영은 잠시 후 다시 확인해 주세요.',
+        );
+      }
+
       completionStateRef.current = 'completed';
-      setAfterImageUrl(afterImageUri);
+      setAfterImageUrl(completion.afterImageUrl);
       setCompletedAt(new Date().toISOString());
-      await markCleaningVerificationPending();
-      router.replace('/' as Href);
+
+      if (!completion.rewardResult.alreadyProcessed) {
+        showRewardResult(ACTIVITY_CATEGORY.CLEANING, completion.rewardResult);
+        return;
+      }
+
+      router.replace((fromQuest ? '/quests' : '/') as Href);
     } catch (error) {
       completionStateRef.current = 'idle';
       if (typeof __DEV__ !== 'undefined' && __DEV__) {
@@ -181,7 +244,7 @@ export function CleaningScreen() {
 
   const confirmReward = () => {
     clearRewardResult();
-    router.replace('/' as Href);
+    router.replace((fromQuest ? '/quests' : '/') as Href);
   };
 
   const goHome = () => {
@@ -395,7 +458,7 @@ export function CleaningScreen() {
 
       <ActivityRewardModal
         visible={rewardModalVisible}
-        categoryId={rewardCategoryId ?? 'cleaning'}
+        categoryId={rewardCategoryId ?? ACTIVITY_CATEGORY.CLEANING}
         result={rewardResult}
         onConfirm={confirmReward}
       />

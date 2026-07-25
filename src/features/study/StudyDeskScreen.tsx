@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -27,8 +27,14 @@ import { useStudySession } from '@/features/study/useStudySession';
 
 const studyDurationOptions = [10, 25, 50] as const;
 
+type StudyDeskRouteParams = {
+  questId?: string;
+  fromQuest?: string;
+};
+
 export function StudyDeskScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<StudyDeskRouteParams>();
   const { profile } = useOnboarding();
   const [selectedCategory, setSelectedCategory] = useState(studyCategories[0]);
   const [studySubject, setStudySubject] = useState('');
@@ -47,6 +53,13 @@ export function StudyDeskScreen() {
     ...selectedCategory,
     label: studySubject.trim() || selectedCategory.label,
   }), [selectedCategory, studySubject]);
+  const questRouteParams = useMemo(() => {
+    if (params.fromQuest !== '1' || !params.questId) return {};
+    return {
+      questId: params.questId,
+      fromQuest: '1',
+    };
+  }, [params.fromQuest, params.questId]);
   const {
     state,
     configure,
@@ -93,10 +106,11 @@ export function StudyDeskScreen() {
           categoryLabel: result.category.label,
           completedPages: result.completedPages.toString(),
           currentPageProgress: result.currentPageProgress.toFixed(4),
+          ...questRouteParams,
         },
       });
     }, 760);
-  }, [finish, router]);
+  }, [finish, questRouteParams, router]);
 
   useEffect(() => {
     if (!isStarted || isCompleting || state.remainingSeconds > 0) return;

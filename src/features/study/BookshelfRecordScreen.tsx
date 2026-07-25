@@ -1,27 +1,44 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ACTIVITY_CATEGORY } from '@/features/activity/constants/activityCategory';
+import { ActivityRewardModal } from '@/features/activity/rewards/components/ActivityRewardModal';
+import { useActivityRewardModal } from '@/features/activity/rewards/hooks/useActivityRewardModal';
+import type { ProcessActivityRewardResult } from '@/features/activity/rewards/types/reward';
+import { completeStudyActivity, startStudyActivity } from '@/features/activity/services/activityService';
 import {
   createStudyBookFromResult,
   formatStudyTime,
   getStudyCategory,
   useStudyBooks,
 } from '@/features/home/studyBooks';
+import {
+  getQuestRouteParam,
+  isFromQuestRoute,
+  linkCompletedActivityToQuest,
+} from '@/features/quests/services/questActivityLinkService';
+import { ensureAnonymousUser } from '@/shared/backend/authRepository';
 
 type BookshelfParams = {
+  startedAt?: string;
   endedAt?: string;
   elapsedSeconds?: string;
+  targetDurationSeconds?: string;
   categoryId?: string;
   categoryLabel?: string;
   completedPages?: string;
+  currentPageProgress?: string;
+  questId?: string;
+  fromQuest?: string;
 };
 
 export function BookshelfRecordScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<BookshelfParams>();
   const {
+    books,
     categorySummaries,
     totalMinutes,
     addBookOnce,
@@ -29,6 +46,7 @@ export function BookshelfRecordScreen() {
   const [isPlacing, setIsPlacing] = useState(false);
   const [placedBookId, setPlacedBookId] = useState<string | null>(null);
   const hasPlacedRef = useRef(false);
+  const shouldReturnToQuestsRef = useRef(false);
   const settle = useRef(new Animated.Value(0)).current;
   const placeProgress = useRef(new Animated.Value(0)).current;
   const newBook = useMemo(() => createStudyBookFromResult(params), [params]);
@@ -48,6 +66,15 @@ export function BookshelfRecordScreen() {
     0,
   );
   const showEmptyPrompt = totalBookCount === 0 && !showNewBook;
+  const questId = getQuestRouteParam(params.questId);
+  const fromQuest = isFromQuestRoute(params.fromQuest);
+  const {
+    rewardResult,
+    rewardModalVisible,
+    rewardCategoryId,
+    showRewardResult,
+    clearRewardResult,
+  } = useActivityRewardModal();
 
   useEffect(() => {
     const animation = Animated.sequence([
@@ -75,8 +102,54 @@ export function BookshelfRecordScreen() {
     setIsPlacing(true);
     placeProgress.setValue(0);
 
+    let nextRewardResult: ProcessActivityRewardResult | null = null;
+    const alreadyHadBook = books.some((book) => book.id === newBook.id);
+
     try {
       await addBookOnce(newBook);
+      if (!alreadyHadBook) {
+        const user = await ensureAnonymousUser();
+        const plannedMinutes = Math.max(1, Math.round(Number(params.targetDurationSeconds ?? 0) / 60));
+        const actualMinutes = newBook.minutes;
+        const activity = await startStudyActivity(user.uid, {
+          subject: newBook.title,
+          plannedMinutes: Number.isFinite(plannedMinutes) ? plannedMinutes : null,
+          bookId: newBook.id ?? null,
+        });
+
+        nextRewardResult = await completeStudyActivity(
+          user.uid,
+          activity.activityId,
+          {
+            subject: newBook.title,
+            plannedMinutes: Number.isFinite(plannedMinutes) ? plannedMinutes : null,
+            actualMinutes,
+            bookId: newBook.id ?? null,
+          },
+          actualMinutes,
+        );
+
+        if (!nextRewardResult) {
+          throw new Error('Study activity reward result is empty.');
+        }
+
+        try {
+          await linkCompletedActivityToQuest({
+            questId,
+            activityId: nextRewardResult.activityId,
+          });
+        } catch (questLinkError) {
+          if (typeof __DEV__ !== 'undefined' && __DEV__) {
+            console.warn('Failed to link study activity to quest.', questLinkError);
+          }
+          if (fromQuest) {
+            Alert.alert(
+              '공부 기록은 저장됐어요',
+              '다만 퀘스트 완료 표시를 갱신하지 못했어요. 퀘스트 화면에서 상태를 다시 확인해 주세요.',
+            );
+          }
+        }
+      }
     } catch {
       setIsPlacing(false);
       hasPlacedRef.current = false;
@@ -92,10 +165,24 @@ export function BookshelfRecordScreen() {
       setIsPlacing(false);
       if (finished) {
         setPlacedBookId(newBook.id ?? null);
+        if (nextRewardResult && !nextRewardResult.alreadyProcessed) {
+          shouldReturnToQuestsRef.current = fromQuest;
+          showRewardResult(ACTIVITY_CATEGORY.STUDY, nextRewardResult);
+        } else if (fromQuest) {
+          router.replace('/quests' as Href);
+        }
         return;
       }
       hasPlacedRef.current = false;
     });
+  };
+
+  const confirmReward = () => {
+    clearRewardResult();
+    if (shouldReturnToQuestsRef.current) {
+      shouldReturnToQuestsRef.current = false;
+      router.replace('/quests' as Href);
+    }
   };
 
   return (
@@ -254,6 +341,12 @@ export function BookshelfRecordScreen() {
           </Text>
         </View>
       </ScrollView>
+      <ActivityRewardModal
+        categoryId={rewardCategoryId ?? ACTIVITY_CATEGORY.STUDY}
+        onConfirm={confirmReward}
+        result={rewardResult}
+        visible={rewardModalVisible}
+      />
     </SafeAreaView>
   );
 }
