@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Easing,
   Modal,
@@ -16,6 +17,11 @@ import {
   WATER_PER_CUP_ML,
   type WaterMissionState,
 } from '@/features/home/waterMission';
+import { useAuth } from '@/features/auth/AuthProvider';
+import { ACTIVITY_CATEGORY } from '@/features/activity/constants/activityCategory';
+import { recordWaterActivity } from '@/features/activity/services/activityService';
+import { ActivityRewardModal } from '@/features/activity/rewards/components/ActivityRewardModal';
+import { useActivityRewardModal } from '@/features/activity/rewards/hooks/useActivityRewardModal';
 
 type WaterMissionLayerProps = {
   disabled?: boolean;
@@ -23,11 +29,13 @@ type WaterMissionLayerProps = {
 };
 
 const cupIndexes = Array.from({ length: DAILY_WATER_CUP_COUNT }, (_, index) => index);
+const CUP_REWARD_MODAL_DELAY_MS = 480;
 
 export function WaterMissionLayer({
   disabled = false,
   onMissionStateChange,
 }: WaterMissionLayerProps) {
+  const { user } = useAuth();
   const {
     state,
     isHydrated,
@@ -39,16 +47,33 @@ export function WaterMissionLayer({
   const [showSuccess, setShowSuccess] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isBloomAnimating, setIsBloomAnimating] = useState(false);
+  const [isSubmittingWaterActivity, setIsSubmittingWaterActivity] = useState(false);
+  const [shouldShowWaterSuccessAfterReward, setShouldShowWaterSuccessAfterReward] = useState(false);
+  const [hasLocalSyncError, setHasLocalSyncError] = useState(false);
   const previousCupCount = useRef(state.cupCount);
   const cupFillValues = useRef(cupIndexes.map(() => new Animated.Value(0))).current;
   const cupBounceValues = useRef(cupIndexes.map(() => new Animated.Value(1))).current;
   const bloomProgress = useRef(new Animated.Value(state.flowerBloomed ? 1 : 0)).current;
   const sparkleProgress = useRef(new Animated.Value(0)).current;
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const waterActivityLock = useRef(false);
+  const {
+    rewardResult,
+    rewardModalVisible,
+    rewardCategoryId,
+    showRewardResult,
+    clearRewardResult,
+  } = useActivityRewardModal();
 
   const consumedMl = state.cupCount * WATER_PER_CUP_ML;
   const isComplete = state.missionCompleted;
-  const canInteract = isHydrated && !disabled && !isRecording && !isBloomAnimating;
+  const canInteract = isHydrated
+    && !disabled
+    && !isRecording
+    && !isBloomAnimating
+    && !isSubmittingWaterActivity
+    && !rewardModalVisible
+    && !hasLocalSyncError;
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -147,11 +172,67 @@ export function WaterMissionLayer({
   const handleCupPress = async (cupIndex?: number) => {
     if (!canInteract || isComplete) return;
     if (typeof cupIndex === 'number' && cupIndex < state.cupCount) return;
+    if (waterActivityLock.current) return;
 
-    const nextState = await recordCup();
-    if (nextState.missionCompleted) {
+    waterActivityLock.current = true;
+    setIsSubmittingWaterActivity(true);
+    let didRecordWaterActivity = false;
+
+    try {
+      if (!user) {
+        Alert.alert('로그인이 필요해요', '물 마시기 기록을 저장하려면 다시 로그인해 주세요.');
+        return;
+      }
+
+      const nextRewardResult = await recordWaterActivity(user.uid, {
+        amountMl: WATER_PER_CUP_ML,
+        cupCount: 1,
+      });
+      if (!nextRewardResult) {
+        throw new Error('Water activity reward result is empty.');
+      }
+      didRecordWaterActivity = true;
+
+      const nextState = await recordCup();
+      const reachedGoal = nextState.missionCompleted && !state.missionCompleted;
+
+      if (nextRewardResult.alreadyProcessed) {
+        if (reachedGoal) setShowSuccess(true);
+        return;
+      }
+
+      await new Promise((resolve) => {
+        setTimeout(resolve, CUP_REWARD_MODAL_DELAY_MS);
+      });
+      setShouldShowWaterSuccessAfterReward(reachedGoal);
+      setShowModal(false);
+      showRewardResult(ACTIVITY_CATEGORY.WATER, nextRewardResult);
+    } catch (error) {
+      if (didRecordWaterActivity) {
+        if (typeof __DEV__ !== 'undefined' && __DEV__) {
+          console.warn('Failed to sync local water mission after Firestore reward.', error);
+        }
+        Alert.alert(
+          '물 기록 화면을 갱신하지 못했어요',
+          '서버 기록은 저장됐지만 화면 반영에 실패했어요. 잠시 후 다시 확인해 주세요.',
+        );
+        setHasLocalSyncError(true);
+      } else {
+        Alert.alert('물 기록을 저장할 수 없어요', '잠시 후 다시 시도해 주세요.');
+      }
+    } finally {
+      waterActivityLock.current = false;
+      setIsSubmittingWaterActivity(false);
+    }
+  };
+
+  const confirmReward = () => {
+    clearRewardResult();
+    if (shouldShowWaterSuccessAfterReward) {
+      setShouldShowWaterSuccessAfterReward(false);
       setShowSuccess(true);
     }
+    setShowModal(true);
   };
 
   const playBloomAnimation = async () => {
@@ -196,7 +277,7 @@ export function WaterMissionLayer({
         accessibilityHint="오늘 물 마시기 기록을 엽니다."
         accessibilityLabel="물 마시기 미션 열기"
         accessibilityRole="button"
-        disabled={!isHydrated || disabled || isBloomAnimating}
+        disabled={!isHydrated || disabled || isBloomAnimating || isSubmittingWaterActivity || rewardModalVisible}
         hitSlop={10}
         onPress={() => setShowModal(true)}
         style={styles.waterHotspot}
@@ -226,7 +307,7 @@ export function WaterMissionLayer({
       <Modal
         animationType="fade"
         onRequestClose={() => {
-          if (!isRecording) setShowModal(false);
+          if (!isRecording && !isSubmittingWaterActivity) setShowModal(false);
         }}
         transparent
         visible={showModal}
@@ -254,7 +335,7 @@ export function WaterMissionLayer({
                 </View>
                 <Pressable
                   accessibilityRole="button"
-                  disabled={isRecording}
+                  disabled={isRecording || isSubmittingWaterActivity}
                   onPress={() => void playBloomAnimation()}
                   style={({ pressed }) => [styles.singleButton, pressed && styles.pressed]}
                 >
@@ -297,7 +378,7 @@ export function WaterMissionLayer({
                           <Pressable
                             accessibilityLabel={`${index + 1}번째 물컵`}
                             accessibilityRole="button"
-                            disabled={!canInteract || isComplete || isRecording}
+                            disabled={!canInteract || isComplete || isRecording || isSubmittingWaterActivity}
                             onPress={() => void handleCupPress(index)}
                             style={({ pressed }) => [
                               styles.cupButton,
@@ -325,7 +406,7 @@ export function WaterMissionLayer({
                 <View style={styles.modalActions}>
                   <Pressable
                     accessibilityRole="button"
-                    disabled={isRecording}
+                    disabled={isRecording || isSubmittingWaterActivity}
                     onPress={() => setShowModal(false)}
                     style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}
                   >
@@ -333,12 +414,12 @@ export function WaterMissionLayer({
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
-                    disabled={!canInteract || isComplete}
+                    disabled={!canInteract || isComplete || isSubmittingWaterActivity}
                     onPress={() => void handleCupPress()}
                     style={({ pressed }) => [
                       styles.drinkButton,
                       pressed && styles.pressed,
-                      (!canInteract || isComplete) && styles.disabled,
+                      (!canInteract || isComplete || isSubmittingWaterActivity) && styles.disabled,
                     ]}
                   >
                     <Text style={styles.drinkText}>물 한 컵 마시기</Text>
@@ -349,6 +430,12 @@ export function WaterMissionLayer({
           </View>
         </View>
       </Modal>
+      <ActivityRewardModal
+        visible={rewardModalVisible}
+        categoryId={rewardCategoryId ?? ACTIVITY_CATEGORY.WATER}
+        result={rewardResult}
+        onConfirm={confirmReward}
+      />
     </>
   );
 }
@@ -370,8 +457,6 @@ const styles = StyleSheet.create({
     top: '58.2%',
     width: 32,
     height: 42,
-    zIndex: 12,
-    elevation: 12,
     alignItems: 'center',
     justifyContent: 'flex-start',
   },
@@ -404,8 +489,6 @@ const styles = StyleSheet.create({
     top: '57.4%',
     width: 58,
     height: 54,
-    zIndex: 14,
-    elevation: 14,
   },
   drop: {
     position: 'absolute',

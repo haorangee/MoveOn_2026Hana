@@ -40,6 +40,9 @@ export type MoveOnProfile = {
   characterId: CharacterId;
   chapter: ChapterId;
   magazineNotificationEnabled: boolean;
+  totalXp: number;
+  level: number;
+  grapes: number;
 };
 
 export type ProfileSyncStatus = 'idle' | 'syncing' | 'synced' | 'offline';
@@ -53,6 +56,9 @@ const initialProfile: MoveOnProfile = {
   characterId: 'daily',
   chapter: 'general',
   magazineNotificationEnabled: false,
+  totalXp: 0,
+  level: 1,
+  grapes: 0,
 };
 
 const LEGACY_PET_NAME = '마루';
@@ -91,6 +97,9 @@ function normalizeProfile(value: unknown): MoveOnProfile | null {
       ? profile.chapter
       : 'general',
     magazineNotificationEnabled: profile.magazineNotificationEnabled === true,
+    totalXp: typeof profile.totalXp === 'number' ? Math.max(0, Math.floor(profile.totalXp)) : 0,
+    level: typeof profile.level === 'number' ? Math.max(1, Math.floor(profile.level)) : 1,
+    grapes: typeof profile.grapes === 'number' ? Math.max(0, Math.floor(profile.grapes)) : 0,
   };
 }
 
@@ -142,6 +151,9 @@ function toUserProfile(profile: MoveOnProfile): UserProfile {
     magazineNotificationEnabled: profile.magazineNotificationEnabled,
     onboardingCompleted: true,
     onboardingVersion: CURRENT_ONBOARDING_VERSION,
+    totalXp: profile.totalXp,
+    level: profile.level,
+    grapes: profile.grapes,
   };
 }
 
@@ -155,6 +167,9 @@ function toMoveOnProfile(profile: UserProfile): MoveOnProfile {
     characterId: profile.characterId,
     chapter: profile.chapter,
     magazineNotificationEnabled: profile.magazineNotificationEnabled,
+    totalXp: profile.totalXp ?? 0,
+    level: profile.level ?? 1,
+    grapes: profile.grapes ?? 0,
   };
 }
 
