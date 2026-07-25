@@ -23,8 +23,7 @@ import {
 import { ActivityRewardModal } from '@/features/activity/rewards/components/ActivityRewardModal';
 import { useActivityRewardModal } from '@/features/activity/rewards/hooks/useActivityRewardModal';
 import {
-  getQuestRouteParam,
-  isFromQuestRoute,
+  getQuestLinkRouteParam,
   linkCompletedActivityToQuest,
 } from '@/features/quests/services/questActivityLinkService';
 import { ensureAnonymousUser } from '@/shared/backend/authRepository';
@@ -36,8 +35,8 @@ import { theme } from '@/shared/theme';
 type CleaningPhase = 'before' | 'cleaning' | 'after' | 'result';
 
 type CleaningRouteParams = {
-  questId?: string;
-  fromQuest?: string;
+  questId?: string | string[];
+  fromQuest?: string | string[];
 };
 
 export function CleaningScreen() {
@@ -69,8 +68,11 @@ export function CleaningScreen() {
 
   const hasBeforePhoto = Boolean(beforeImageUri);
   const hasAfterPhoto = Boolean(afterImageUri);
-  const questId = getQuestRouteParam(params.questId);
-  const fromQuest = isFromQuestRoute(params.fromQuest);
+  const normalizedQuestId = getQuestLinkRouteParam({
+    questId: params.questId,
+    fromQuest: params.fromQuest,
+  });
+  const fromQuest = normalizedQuestId !== null;
 
   const cameraLabel = useMemo(() => (
     phase === 'before'
@@ -192,20 +194,22 @@ export function CleaningScreen() {
         throw new Error('Cleaning reward result is empty.');
       }
 
-      try {
-        await linkCompletedActivityToQuest({
-          questId,
-          activityId: completion.rewardResult.activityId,
-        });
-      } catch (questLinkError) {
-        if (typeof __DEV__ !== 'undefined' && __DEV__) {
-          console.warn('Failed to link cleaning activity to quest.', questLinkError);
-        }
-        if (fromQuest) {
-          Alert.alert(
-            '청소 기록은 저장됐어요',
-            '다만 퀘스트 완료 표시를 갱신하지 못했어요. 퀘스트 화면에서 상태를 다시 확인해 주세요.',
-          );
+      if (normalizedQuestId && completion.rewardResult.activityId) {
+        try {
+          await linkCompletedActivityToQuest({
+            questId: normalizedQuestId,
+            activityId: completion.rewardResult.activityId,
+          });
+        } catch (questLinkError) {
+          if (typeof __DEV__ !== 'undefined' && __DEV__) {
+            console.warn('Failed to link cleaning activity to quest.', questLinkError);
+          }
+          if (fromQuest) {
+            Alert.alert(
+              '청소 기록은 저장됐어요',
+              '다만 퀘스트 완료 표시를 갱신하지 못했어요. 퀘스트 화면에서 상태를 다시 확인해 주세요.',
+            );
+          }
         }
       }
 

@@ -24,12 +24,13 @@ import {
   studyCategories,
 } from '@/features/study/studySession';
 import { useStudySession } from '@/features/study/useStudySession';
+import { getQuestLinkRouteParam } from '@/features/quests/services/questActivityLinkService';
 
 const studyDurationOptions = [10, 25, 50] as const;
 
 type StudyDeskRouteParams = {
-  questId?: string;
-  fromQuest?: string;
+  questId?: string | string[];
+  fromQuest?: string | string[];
 };
 
 export function StudyDeskScreen() {
@@ -53,13 +54,17 @@ export function StudyDeskScreen() {
     ...selectedCategory,
     label: studySubject.trim() || selectedCategory.label,
   }), [selectedCategory, studySubject]);
+  const normalizedQuestId = getQuestLinkRouteParam({
+    questId: params.questId,
+    fromQuest: params.fromQuest,
+  });
   const questRouteParams = useMemo(() => {
-    if (params.fromQuest !== '1' || !params.questId) return {};
+    if (!normalizedQuestId) return {};
     return {
-      questId: params.questId,
+      questId: normalizedQuestId,
       fromQuest: '1',
     };
-  }, [params.fromQuest, params.questId]);
+  }, [normalizedQuestId]);
   const {
     state,
     configure,

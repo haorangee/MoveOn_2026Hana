@@ -1,6 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { firebaseAuth } from '@/config/firebaseAuth';
-import { completeQuest } from '@/features/quests/services/questService';
+import { ACTIVITY_CATEGORY } from '@/features/activity/constants/activityCategory';
+import {
+  QuestError,
+  completeQuest,
+  getQuest,
+} from '@/features/quests/services/questService';
 
 const PENDING_WATER_QUEST_STORAGE_KEY = '@moveon/quests/pending-water-quest-id';
 
@@ -16,13 +21,50 @@ export type LinkCompletedActivityResult = {
   alreadyProcessed: boolean;
 };
 
+export type PendingWaterQuestResolution =
+  | {
+      canLink: false;
+      questId: null;
+      shouldClear: false;
+      reason: 'empty';
+    }
+  | {
+      canLink: false;
+      questId: string;
+      shouldClear: true;
+      reason: 'not_found' | 'skipped' | 'completed' | 'wrong_category' | 'invalid_status';
+    }
+  | {
+      canLink: true;
+      questId: string;
+      shouldClear: false;
+      reason: 'pending_water';
+    };
+
 export function getQuestRouteParam(value: RouteParamValue) {
   if (Array.isArray(value)) return value[0] ?? null;
   return value ?? null;
 }
 
+function getSingleRouteParam(value: RouteParamValue) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized || null;
+}
+
 export function isFromQuestRoute(value: RouteParamValue) {
-  return getQuestRouteParam(value) === '1';
+  return getSingleRouteParam(value) === '1';
+}
+
+export function getQuestLinkRouteParam({
+  questId,
+  fromQuest,
+}: {
+  questId?: RouteParamValue;
+  fromQuest?: RouteParamValue;
+}) {
+  if (!isFromQuestRoute(fromQuest)) return null;
+  return getSingleRouteParam(questId);
 }
 
 export async function linkCompletedActivityToQuest({
@@ -70,9 +112,94 @@ export async function loadPendingWaterQuestId() {
   return value?.trim() || null;
 }
 
-export async function clearPendingWaterQuestId(expectedQuestId?: string | null) {
+export async function clearPendingWaterQuestIfMatches(questId: string) {
+  const normalizedQuestId = questId.trim();
+  if (!normalizedQuestId) return false;
   const currentQuestId = await loadPendingWaterQuestId();
-  if (!currentQuestId) return;
-  if (expectedQuestId && currentQuestId !== expectedQuestId) return;
+  if (currentQuestId !== normalizedQuestId) return false;
   await AsyncStorage.removeItem(PENDING_WATER_QUEST_STORAGE_KEY);
+  return true;
+}
+
+export async function clearPendingWaterQuestId(expectedQuestId?: string | null) {
+  if (expectedQuestId) {
+    await clearPendingWaterQuestIfMatches(expectedQuestId);
+    return;
+  }
+  await AsyncStorage.removeItem(PENDING_WATER_QUEST_STORAGE_KEY);
+}
+
+export async function resolvePendingWaterQuestForLink(userId: string): Promise<PendingWaterQuestResolution> {
+  const pendingQuestId = await loadPendingWaterQuestId();
+  if (!pendingQuestId) {
+    return {
+      canLink: false,
+      questId: null,
+      shouldClear: false,
+      reason: 'empty',
+    };
+  }
+
+  const quest = await getQuest(userId, pendingQuestId);
+  if (!quest) {
+    return {
+      canLink: false,
+      questId: pendingQuestId,
+      shouldClear: true,
+      reason: 'not_found',
+    };
+  }
+
+  if (quest.status === 'completed') {
+    return {
+      canLink: false,
+      questId: pendingQuestId,
+      shouldClear: true,
+      reason: 'completed',
+    };
+  }
+
+  if (quest.status === 'skipped') {
+    return {
+      canLink: false,
+      questId: pendingQuestId,
+      shouldClear: true,
+      reason: 'skipped',
+    };
+  }
+
+  if (quest.category !== ACTIVITY_CATEGORY.WATER) {
+    return {
+      canLink: false,
+      questId: pendingQuestId,
+      shouldClear: true,
+      reason: 'wrong_category',
+    };
+  }
+
+  if (quest.status !== 'pending') {
+    return {
+      canLink: false,
+      questId: pendingQuestId,
+      shouldClear: true,
+      reason: 'invalid_status',
+    };
+  }
+
+  return {
+    canLink: true,
+    questId: pendingQuestId,
+    shouldClear: false,
+    reason: 'pending_water',
+  };
+}
+
+export function isNonRetryableQuestLinkError(error: unknown) {
+  return error instanceof QuestError
+    && (
+      error.code === 'QUEST_NOT_FOUND'
+      || error.code === 'QUEST_ALREADY_SKIPPED'
+      || error.code === 'QUEST_ALREADY_COMPLETED'
+      || error.code === 'QUEST_INVALID_TRANSITION'
+    );
 }

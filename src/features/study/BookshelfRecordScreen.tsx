@@ -15,8 +15,7 @@ import {
   useStudyBooks,
 } from '@/features/home/studyBooks';
 import {
-  getQuestRouteParam,
-  isFromQuestRoute,
+  getQuestLinkRouteParam,
   linkCompletedActivityToQuest,
 } from '@/features/quests/services/questActivityLinkService';
 import { ensureAnonymousUser } from '@/shared/backend/authRepository';
@@ -30,8 +29,8 @@ type BookshelfParams = {
   categoryLabel?: string;
   completedPages?: string;
   currentPageProgress?: string;
-  questId?: string;
-  fromQuest?: string;
+  questId?: string | string[];
+  fromQuest?: string | string[];
 };
 
 export function BookshelfRecordScreen() {
@@ -66,8 +65,11 @@ export function BookshelfRecordScreen() {
     0,
   );
   const showEmptyPrompt = totalBookCount === 0 && !showNewBook;
-  const questId = getQuestRouteParam(params.questId);
-  const fromQuest = isFromQuestRoute(params.fromQuest);
+  const normalizedQuestId = getQuestLinkRouteParam({
+    questId: params.questId,
+    fromQuest: params.fromQuest,
+  });
+  const fromQuest = normalizedQuestId !== null;
   const {
     rewardResult,
     rewardModalVisible,
@@ -133,20 +135,22 @@ export function BookshelfRecordScreen() {
           throw new Error('Study activity reward result is empty.');
         }
 
-        try {
-          await linkCompletedActivityToQuest({
-            questId,
-            activityId: nextRewardResult.activityId,
-          });
-        } catch (questLinkError) {
-          if (typeof __DEV__ !== 'undefined' && __DEV__) {
-            console.warn('Failed to link study activity to quest.', questLinkError);
-          }
-          if (fromQuest) {
-            Alert.alert(
-              '공부 기록은 저장됐어요',
-              '다만 퀘스트 완료 표시를 갱신하지 못했어요. 퀘스트 화면에서 상태를 다시 확인해 주세요.',
-            );
+        if (normalizedQuestId && nextRewardResult.activityId) {
+          try {
+            await linkCompletedActivityToQuest({
+              questId: normalizedQuestId,
+              activityId: nextRewardResult.activityId,
+            });
+          } catch (questLinkError) {
+            if (typeof __DEV__ !== 'undefined' && __DEV__) {
+              console.warn('Failed to link study activity to quest.', questLinkError);
+            }
+            if (fromQuest) {
+              Alert.alert(
+                '공부 기록은 저장됐어요',
+                '다만 퀘스트 완료 표시를 갱신하지 못했어요. 퀘스트 화면에서 상태를 다시 확인해 주세요.',
+              );
+            }
           }
         }
       }

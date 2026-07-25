@@ -20,8 +20,7 @@ import { ActivityRewardModal } from '@/features/activity/rewards/components/Acti
 import { useActivityRewardModal } from '@/features/activity/rewards/hooks/useActivityRewardModal';
 import { completeShowerActivity } from '@/features/activity/services/activityService';
 import {
-  getQuestRouteParam,
-  isFromQuestRoute,
+  getQuestLinkRouteParam,
   linkCompletedActivityToQuest,
 } from '@/features/quests/services/questActivityLinkService';
 import {
@@ -44,8 +43,8 @@ const bathroomImage = require('../../../assets/bathroom-shower.png');
 type ShowerPhase = 'idle' | 'running' | 'result';
 
 type ShowerRouteParams = {
-  questId?: string;
-  fromQuest?: string;
+  questId?: string | string[];
+  fromQuest?: string | string[];
 };
 
 export function ShowerScreen() {
@@ -86,8 +85,11 @@ export function ShowerScreen() {
   const targetReached = elapsedSeconds >= selectedSeconds;
   const todaySeconds = record?.totalSeconds ?? 0;
   const todayMinutes = todaySeconds > 0 ? getDisplayShowerMinutes(todaySeconds) : 0;
-  const questId = getQuestRouteParam(params.questId);
-  const fromQuest = isFromQuestRoute(params.fromQuest);
+  const normalizedQuestId = getQuestLinkRouteParam({
+    questId: params.questId,
+    fromQuest: params.fromQuest,
+  });
+  const fromQuest = normalizedQuestId !== null;
 
   useEffect(() => {
     let mounted = true;
@@ -184,20 +186,22 @@ export function ShowerScreen() {
           targetMet: actualSeconds >= selectedMinutes * 60,
         });
         if (nextRewardResult) {
-          try {
-            await linkCompletedActivityToQuest({
-              questId,
-              activityId: nextRewardResult.activityId,
-            });
-          } catch (questLinkError) {
-            if (typeof __DEV__ !== 'undefined' && __DEV__) {
-              console.warn('Failed to link shower activity to quest.', questLinkError);
-            }
-            if (fromQuest) {
-              Alert.alert(
-                '샤워 기록은 저장됐어요',
-                '다만 퀘스트 완료 표시를 갱신하지 못했어요. 퀘스트 화면에서 상태를 다시 확인해 주세요.',
-              );
+          if (normalizedQuestId && nextRewardResult.activityId) {
+            try {
+              await linkCompletedActivityToQuest({
+                questId: normalizedQuestId,
+                activityId: nextRewardResult.activityId,
+              });
+            } catch (questLinkError) {
+              if (typeof __DEV__ !== 'undefined' && __DEV__) {
+                console.warn('Failed to link shower activity to quest.', questLinkError);
+              }
+              if (fromQuest) {
+                Alert.alert(
+                  '샤워 기록은 저장됐어요',
+                  '다만 퀘스트 완료 표시를 갱신하지 못했어요. 퀘스트 화면에서 상태를 다시 확인해 주세요.',
+                );
+              }
             }
           }
           const updatedRecord = await markShowerRewardProcessed();

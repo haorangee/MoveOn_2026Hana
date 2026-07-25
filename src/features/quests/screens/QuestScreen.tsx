@@ -20,7 +20,10 @@ import { QuestCard } from '../components/QuestCard';
 import { QuestEmptyState } from '../components/QuestEmptyState';
 import { QuestFormModal } from '../components/QuestFormModal';
 import { useTodayQuests } from '../hooks/useTodayQuests';
-import { savePendingWaterQuestId } from '../services/questActivityLinkService';
+import {
+  clearPendingWaterQuestIfMatches,
+  savePendingWaterQuestId,
+} from '../services/questActivityLinkService';
 
 type FormState = {
   mode: 'create' | 'edit';
@@ -100,6 +103,17 @@ export default function QuestScreen() {
 
   const isMutating = processingQuestId !== null;
 
+  const clearPendingWaterQuestAfterMutation = async (quest: Quest, action: string) => {
+    if (quest.category !== ACTIVITY_CATEGORY.WATER) return;
+    try {
+      await clearPendingWaterQuestIfMatches(quest.id);
+    } catch (cleanupError) {
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        console.warn(`Failed to clear pending water quest after ${action}.`, cleanupError);
+      }
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       void reload({ quiet: true });
@@ -144,6 +158,7 @@ export default function QuestScreen() {
           onPress: async () => {
             try {
               await deleteQuest(quest.id);
+              await clearPendingWaterQuestAfterMutation(quest, 'delete');
               setNotice('퀘스트 메모를 보드에서 떼어냈어요.');
             } catch (deleteError) {
               Alert.alert('삭제할 수 없어요', deleteError instanceof Error ? deleteError.message : '잠시 후 다시 시도해 주세요.');
@@ -165,6 +180,7 @@ export default function QuestScreen() {
           onPress: async () => {
             try {
               await skipQuest(quest.id);
+              await clearPendingWaterQuestAfterMutation(quest, 'skip');
               setNotice('오늘은 이 퀘스트를 쉬어가기로 했어요.');
             } catch (skipError) {
               Alert.alert('건너뛸 수 없어요', skipError instanceof Error ? skipError.message : '잠시 후 다시 시도해 주세요.');
