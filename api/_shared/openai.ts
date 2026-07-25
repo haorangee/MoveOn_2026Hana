@@ -29,44 +29,52 @@ export async function generateStructuredJson<T>(params: {
   instructions: string;
   input: unknown;
   userId: string;
+  timeoutMs?: number;
 }): Promise<T> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_NOT_CONFIGURED');
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), params.timeoutMs ?? 12000);
   const safetyIdentifier = createHash('sha256')
     .update(`moveon:${params.userId}`)
     .digest('hex');
 
-  const response = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: params.model,
-      store: false,
-      safety_identifier: safetyIdentifier,
-      reasoning: { effort: 'low' },
-      instructions: params.instructions,
-      input: JSON.stringify(params.input),
-      text: {
-        verbosity: 'low',
-        format: {
-          type: 'json_schema',
-          name: params.schemaName,
-          strict: true,
-          schema: params.schema,
-        },
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
-    }),
-  });
+      body: JSON.stringify({
+        model: params.model,
+        store: false,
+        safety_identifier: safetyIdentifier,
+        reasoning: { effort: 'low' },
+        instructions: params.instructions,
+        input: JSON.stringify(params.input),
+        text: {
+          verbosity: 'low',
+          format: {
+            type: 'json_schema',
+            name: params.schemaName,
+            strict: true,
+            schema: params.schema,
+          },
+        },
+      }),
+    });
 
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`OPENAI_REQUEST_FAILED:${response.status}:${detail.slice(0, 300)}`);
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(`OPENAI_REQUEST_FAILED:${response.status}:${detail.slice(0, 300)}`);
+    }
+
+    const payload = await response.json() as OpenAIResponse;
+    return JSON.parse(responseText(payload)) as T;
+  } finally {
+    clearTimeout(timeout);
   }
-
-  const payload = await response.json() as OpenAIResponse;
-  return JSON.parse(responseText(payload)) as T;
 }
