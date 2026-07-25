@@ -1,3 +1,31 @@
+import type { QuestDraft } from './quest';
+
+export type AiRequestType =
+  | 'QUEST_RECOMMENDATION'
+  | 'PET_MESSAGE'
+  | 'COMPLETION_PRAISE'
+  | 'MOVEON_TIMES';
+
+export type AiContentSource = 'ai' | 'fallback';
+
+export interface AiGenerationResult<T> {
+  data: T;
+  source: AiContentSource;
+  generatedAt: string;
+  requestId?: string;
+}
+
+export interface AiFallbackMessages {
+  petMessage: string;
+  completionPraise: string;
+  questRecommendation: string;
+  moveOnTimes: string;
+}
+
+export type AiQuestRecommendation = QuestDraft & {
+  source: AiContentSource;
+};
+
 export type QuestType = 'study' | 'recovery' | 'water' | 'clean';
 
 export type PersonalizedQuest = {
@@ -14,7 +42,7 @@ export type PersonalizedQuest = {
 export type DailyQuestSet = {
   date: string;
   generatedAt: string;
-  source: 'ai' | 'fallback';
+  source: AiContentSource;
   quests: PersonalizedQuest[];
 };
 
@@ -33,7 +61,7 @@ export type MoveOnTimesIssue = {
   tagline: string;
   editorComment: string;
   generatedAt: string;
-  source: 'ai' | 'fallback';
+  source: AiContentSource;
   leadArticle: MoveOnTimesArticle;
   articles: MoveOnTimesArticle[];
 };
