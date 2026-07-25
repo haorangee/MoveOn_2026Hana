@@ -171,10 +171,10 @@ function AnimatedBook({
 const styles = StyleSheet.create({
   bookshelf: {
     position: 'absolute',
-    left: '54.8%',
-    top: '2.6%',
-    width: '21.2%',
-    height: '30.8%',
+    left: '55.8%',
+    top: '18.6%',
+    width: '18.6%',
+    height: '37.5%',
   },
   touchTarget: {
     flex: 1,

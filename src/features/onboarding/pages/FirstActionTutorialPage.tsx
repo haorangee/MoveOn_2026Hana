@@ -17,8 +17,6 @@ type FirstActionStep =
   | 'notebook'
   | 'pen'
   | 'timer'
-  | 'book'
-  | 'shelf'
   | 'celebrate';
 
 const categories = [
@@ -60,8 +58,7 @@ export function FirstActionTutorialPage({
   const [category, setCategory] = useState<(typeof categories)[number]>(categories[0]);
   const [elapsed, setElapsed] = useState(0);
   const startedAt = useRef<number | null>(null);
-  const createdThisRun = useRef(firstBookCreated);
-  const bookTravel = useRef(new Animated.Value(0)).current;
+  const rewardProgress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const duration = preparationDurations[step];
@@ -77,9 +74,9 @@ export function FirstActionTutorialPage({
 
     const tick = () => {
       if (startedAt.current === null) return;
-      const nextElapsed = Math.min(5, (Date.now() - startedAt.current) / 1000);
+      const nextElapsed = Math.min(3, (Date.now() - startedAt.current) / 1000);
       setElapsed(nextElapsed);
-      if (nextElapsed >= 5) setStep('book');
+      if (nextElapsed >= 3) setStep('celebrate');
     };
     tick();
     const timer = setInterval(tick, 100);
@@ -87,47 +84,28 @@ export function FirstActionTutorialPage({
   }, [step]);
 
   useEffect(() => {
-    if (step !== 'book') return;
-    bookTravel.setValue(0);
-    const reveal = setTimeout(() => setStep('shelf'), 900);
-    return () => clearTimeout(reveal);
-  }, [bookTravel, step]);
-
-  useEffect(() => {
-    if (step !== 'shelf') return;
-    const travel = Animated.timing(bookTravel, {
+    if (step !== 'celebrate') return;
+    rewardProgress.setValue(0);
+    const reward = Animated.timing(rewardProgress, {
       toValue: 1,
-      duration: 1250,
-      easing: Easing.inOut(Easing.cubic),
+      duration: 760,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: Platform.OS !== 'web',
     });
-    travel.start(({ finished }) => {
-      if (!finished) return;
-      if (!createdThisRun.current) {
-        createdThisRun.current = true;
-        onBookCreated();
-      }
-      setStep('celebrate');
-    });
-    return () => travel.stop();
-  }, [bookTravel, onBookCreated, step]);
+    reward.start();
+    return () => reward.stop();
+  }, [rewardProgress, step]);
 
   const handleObjectPress = (id: TutorialObjectId) => {
     if (step === 'desk' && id === 'desk') setStep('category');
   };
 
   const lineCount = Math.floor((elapsed / 5) * 8);
-  const showingDesk = ['walking', 'sitting', 'notebook', 'pen', 'timer', 'book'].includes(step);
+  const showingDesk = ['walking', 'sitting', 'notebook', 'pen', 'timer'].includes(step);
   const showingPage = ['notebook', 'pen', 'timer'].includes(step);
   const showingPen = step === 'pen' || step === 'timer';
-  const highlightedObject = step === 'desk'
-    ? 'desk'
-    : step === 'shelf' || step === 'celebrate'
-      ? 'bookshelf'
-      : null;
-  const characterActivity: TutorialCharacterActivity = step === 'shelf'
-    ? 'bookshelf'
-    : step === 'celebrate'
+  const highlightedObject = step === 'desk' ? 'desk' : null;
+  const characterActivity: TutorialCharacterActivity = step === 'celebrate'
       ? 'celebrate'
       : showingDesk
         ? 'desk'
@@ -143,7 +121,7 @@ export function FirstActionTutorialPage({
       <TutorialRoomScene
         characterActivity={characterActivity}
         characterId={characterId}
-        growthLevel={step === 'celebrate' ? 2 : step === 'shelf' ? 1 : 0}
+        growthLevel={0}
         highlightedObject={highlightedObject}
         lighting="afternoon"
         message={step === 'desk' ? '책상을 한번 눌러볼까요?' : undefined}
@@ -219,38 +197,27 @@ export function FirstActionTutorialPage({
           </>
         ) : null}
 
-        {step === 'book' || step === 'shelf' ? (
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.createdBook,
-              { backgroundColor: category.color },
-              {
-                transform: [
-                  { translateX: bookTravel.interpolate({ inputRange: [0, 1], outputRange: [0, 112] }) },
-                  { translateY: bookTravel.interpolate({ inputRange: [0, 1], outputRange: [0, -42] }) },
-                  { scale: bookTravel.interpolate({ inputRange: [0, 1], outputRange: [1, 0.33] }) },
-                  { rotate: bookTravel.interpolate({ inputRange: [0, 1], outputRange: ['-8deg', '90deg'] }) },
-                ],
-              },
-            ]}
-          >
-            <View style={styles.bookPageBlock} />
-            <View style={styles.bookSpine} />
-            <View style={styles.bookTopBand} />
-            <Text style={styles.createdBookTitle}>{category.label}</Text>
-            <Text style={styles.createdBookMeta}>첫 기록</Text>
-          </Animated.View>
-        ) : null}
-
         {step === 'celebrate' ? (
           <View style={styles.celebration}>
             <View style={styles.celebrationRule} />
-            <Text style={styles.celebrationKicker}>첫 번째 책이 생겼어요.</Text>
-            <Text style={styles.celebrationTitle}>첫 행동을 시작했어요.</Text>
+            <Text style={styles.celebrationKicker}>미션 완료!</Text>
+            <Text style={styles.celebrationTitle}>오늘의 할 일을 완료했어요.</Text>
             <Text style={styles.celebrationDescription}>
-              작은 시간이 모이면 당신만의 방과 서재가 자라나요.
+              미션을 완료하면 경험치와 포도를 받을 수 있어요!
             </Text>
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.rewardPreview,
+                {
+                  opacity: rewardProgress,
+                  transform: [{ translateY: rewardProgress.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }],
+                },
+              ]}
+            >
+              <Text style={styles.rewardPill}>+10 XP</Text>
+              <Text style={styles.rewardPill}>+5 포도</Text>
+            </Animated.View>
             <Pressable
               accessibilityRole="button"
               onPress={onDone}
@@ -268,22 +235,19 @@ export function FirstActionTutorialPage({
 
 function getTitle(step: FirstActionStep) {
   if (step === 'desk') return '방에서 첫 행동을 시작해요';
-  if (step === 'category') return '오늘은 어떤 책을 만들어볼까요?';
+  if (step === 'category') return '오늘의 할 일을 선택해요';
   if (step === 'walking') return '캐릭터가 책상으로 가고 있어요';
   if (step === 'sitting') return '의자를 빼고 자리를 잡아요';
   if (step === 'notebook') return '공책을 천천히 펼쳐요';
   if (step === 'pen') return '펜을 들고 준비해요';
   if (step === 'timer') return '잠깐만 집중해 볼까요?';
-  if (step === 'book') return '첫 페이지가 한 권의 책이 돼요';
-  return '책이 책장으로 이동하고 있어요';
+  return '미션이 완료됐어요';
 }
 
 function getDescription(step: FirstActionStep) {
   if (step === 'desk') return '메뉴가 아니라 방 안의 실제 책상을 눌러보세요.';
-  if (step === 'category') return '선택한 활동의 색이 책 표지가 돼요.';
-  if (step === 'timer') return '5초 동안 공책에 한 페이지를 채워볼게요.';
-  if (step === 'book') return '사용한 시간이 눈앞에서 책으로 바뀌어요.';
-  if (step === 'shelf') return '첫 기록이 내 방의 책장에 남아요.';
+  if (step === 'category') return '첫 행동에서는 미션을 선택하고 완료하는 흐름만 익혀요.';
+  if (step === 'timer') return '짧은 예시 타이머로 미션 완료 과정을 보여줄게요.';
   return '마루도 캐릭터를 따라 조용히 움직여요.';
 }
 
@@ -340,35 +304,13 @@ const styles = StyleSheet.create({
   writingLineFilled: { backgroundColor: '#66758A' },
   pen: { position: 'absolute', top: '57%', width: 28, height: 3, borderRadius: 2, backgroundColor: '#4D5660', transform: [{ rotate: '-34deg' }] },
   writingSound: { position: 'absolute', left: '29%', top: '59%', color: '#665746', fontSize: 9, fontWeight: '700', fontStyle: 'italic' },
-  createdBook: {
-    position: 'absolute',
-    left: '31%',
-    top: '44%',
-    width: 104,
-    height: 68,
-    paddingVertical: 8,
-    paddingLeft: 18,
-    paddingRight: 10,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(73,57,43,0.2)',
-    shadowColor: '#2B251F',
-    shadowOffset: { width: 0, height: 7 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 9,
-    transform: [{ rotate: '-8deg' }],
-  },
-  bookPageBlock: { position: 'absolute', right: 0, top: 7, bottom: 7, width: 10, borderTopRightRadius: 5, borderBottomRightRadius: 5, backgroundColor: 'rgba(255,246,226,0.88)' },
-  bookSpine: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 12, borderTopLeftRadius: 6, borderBottomLeftRadius: 6, backgroundColor: 'rgba(61,44,34,0.25)' },
-  bookTopBand: { height: 7, width: '72%', marginTop: 5, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.5)' },
-  createdBookTitle: { marginTop: 9, color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
-  createdBookMeta: { position: 'absolute', left: 18, bottom: 8, color: 'rgba(255,255,255,0.82)', fontSize: 7, fontWeight: '800' },
   celebration: { position: 'absolute', left: 20, right: 20, bottom: 20, minHeight: 176, padding: 16, borderRadius: 21, backgroundColor: 'rgba(246,239,226,0.91)', shadowColor: '#2F271F', shadowOpacity: 0.2, shadowRadius: 13, elevation: 9 },
   celebrationRule: { width: 34, height: 2, marginBottom: 11, backgroundColor: '#82906A' },
   celebrationKicker: { color: '#7C8764', fontSize: 10, fontWeight: '900' },
   celebrationTitle: { marginTop: 6, color: '#352D25', fontSize: 21, fontWeight: '900', letterSpacing: -0.7 },
   celebrationDescription: { marginTop: 7, color: '#776959', fontSize: 10, lineHeight: 16 },
+  rewardPreview: { marginTop: 10, flexDirection: 'row', gap: 8 },
+  rewardPill: { overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, color: '#FFF9EF', fontSize: 10, fontWeight: '900', backgroundColor: '#765E8B' },
   doneButton: { minHeight: 47, marginTop: 12, borderRadius: 15, backgroundColor: '#675646', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   doneButtonText: { color: '#FFF9EE', fontSize: 13, fontWeight: '900' },
   pressed: { opacity: 0.84 },

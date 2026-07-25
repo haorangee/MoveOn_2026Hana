@@ -51,6 +51,7 @@ export const roomHotspots: RoomHotspot[] = [
     actionLabel: '샤워하기',
     feedback: '수건을 챙겨 욕실로 가는 중…',
     activity: 'bathroom',
+    route: '/shower',
     frame: { left: '0%', top: '13%', width: '15%', height: '42%' },
     focus: { x: 0.08, y: 0.35, scale: 1.7 },
   },
@@ -83,7 +84,7 @@ export const roomHotspots: RoomHotspot[] = [
     feedback: '내가 쌓아온 공부 기록을 펼쳐보는 중…',
     activity: 'bookshelf',
     route: '/bookshelf',
-    frame: { left: '54.8%', top: '18.6%', width: '21.2%', height: '60.8%' },
+    frame: { left: '55.8%', top: '18.6%', width: '18.6%', height: '37.5%' },
     focus: { x: 0.66, y: 0.34, scale: 1.7 },
   },
   {
@@ -93,7 +94,7 @@ export const roomHotspots: RoomHotspot[] = [
     actionLabel: '수면',
     feedback: '마루와 함께 침대를 정돈하고 있어요.',
     activity: 'bed',
-    frame: { left: '55%', top: '36%', width: '45%', height: '31%' },
+    frame: { left: '62%', top: '35%', width: '34%', height: '21%' },
     focus: { x: 0.78, y: 0.51, scale: 1.48 },
   },
   {

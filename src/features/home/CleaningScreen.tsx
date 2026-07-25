@@ -7,15 +7,13 @@ import {
   ActivityIndicator,
   Alert,
   ImageBackground,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { firebaseAuth } from '@/config/firebaseAuth';
-import { useAuth } from '@/features/auth/AuthProvider';
 import { useOnboarding } from '@/features/onboarding/OnboardingProvider';
-import { createCleaningSession, completeCleaningSession } from '@/features/home/data/cleaningRepository';
 import { markCleaningVerificationPending } from '@/features/home/cleaningMission';
 import { ActivityRewardModal } from '@/features/activity/rewards/components/ActivityRewardModal';
 import { useActivityRewardModal } from '@/features/activity/rewards/hooks/useActivityRewardModal';
@@ -28,7 +26,6 @@ type CleaningPhase = 'before' | 'cleaning' | 'after' | 'result';
 
 export function CleaningScreen() {
   const router = useRouter();
-  const { user, signInAnonymously } = useAuth();
   const { profile } = useOnboarding();
   const [phase, setPhase] = useState<CleaningPhase>('before');
   const [beforeImageUri, setBeforeImageUri] = useState<string | null>(null);
@@ -62,38 +59,35 @@ export function CleaningScreen() {
       : '청소 후 모습을 찍어주세요'
   ), [phase]);
 
-  const resolveUserId = async () => {
-    if (user?.uid) return user.uid;
-    if (firebaseAuth.currentUser?.uid) return firebaseAuth.currentUser.uid;
-
-    await signInAnonymously();
-
-    const nextUid = firebaseAuth.currentUser?.uid;
-    if (!nextUid) {
-      throw new Error('Cleaning requires an authenticated Firebase user.');
-    }
-    return nextUid;
-  };
-
   const takePhoto = async () => {
     if (pickingPhotoRef.current || isSaving) return;
 
     pickingPhotoRef.current = true;
     setIsPickingPhoto(true);
     try {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      setPermissionRequested(true);
-      if (!permission.granted) {
-        Alert.alert('카메라 권한이 필요해요', '청소 사진을 찍으려면 카메라 권한을 허용해 주세요.');
-        return;
-      }
+      const result = Platform.OS === 'web'
+        ? await ImagePicker.launchImageLibraryAsync({
+          allowsEditing: false,
+          quality: 0.55,
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        })
+        : await (async () => {
+          const permission = await ImagePicker.requestCameraPermissionsAsync();
+          setPermissionRequested(true);
+          if (!permission.granted) {
+            Alert.alert('카메라 권한이 필요해요', '청소 사진을 찍으려면 카메라 권한을 허용해 주세요.');
+            return null;
+          }
 
-      const result = await ImagePicker.launchCameraAsync({
-        cameraType: ImagePicker.CameraType.back,
-        allowsEditing: true,
-        quality: 0.92,
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      });
+          return ImagePicker.launchCameraAsync({
+            cameraType: ImagePicker.CameraType.back,
+            allowsEditing: true,
+            quality: 0.75,
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          });
+        })();
+
+      if (!result) return;
 
       if (result.canceled) return;
 
@@ -146,11 +140,10 @@ export function CleaningScreen() {
     startStateRef.current = 'submitting';
     setIsSaving(true);
     try {
-      const userId = await resolveUserId();
-      const record = await createCleaningSession(userId, beforeImageUri);
-      setCleaningSessionId(record.cleaningSessionId);
-      setCleaningUserId(userId);
-      setBeforeImageUrl(record.beforeImageUrl);
+      const localSessionId = `local-cleaning-${Date.now()}`;
+      setCleaningSessionId(localSessionId);
+      setCleaningUserId('local-mvp');
+      setBeforeImageUrl(beforeImageUri);
       setStartedAt(new Date().toISOString());
       startStateRef.current = 'started';
       setPhase('cleaning');
@@ -159,7 +152,7 @@ export function CleaningScreen() {
       if (typeof __DEV__ !== 'undefined' && __DEV__) {
         console.warn('Failed to start cleaning session.', error);
       }
-      Alert.alert('청소를 시작할 수 없어요', '비포 사진 저장에 실패했습니다. 다시 시도해 주세요.');
+      Alert.alert('청소를 시작할 수 없어요', '사진을 처리하지 못했습니다. 다시 시도해 주세요.');
     } finally {
       setIsSaving(false);
     }
@@ -169,30 +162,18 @@ export function CleaningScreen() {
     if (!cleaningSessionId || !afterImageUri || completionStateRef.current !== 'idle') return;
     completionStateRef.current = 'submitting';
     setIsSaving(true);
-    let didCompleteSession = false;
     try {
-      const userId = cleaningUserId ?? await resolveUserId();
-      const { afterImageUrl: url, rewardResult: nextRewardResult } = await completeCleaningSession(userId, cleaningSessionId, afterImageUri);
-      didCompleteSession = true;
       completionStateRef.current = 'completed';
-      setAfterImageUrl(url);
+      setAfterImageUrl(afterImageUri);
       setCompletedAt(new Date().toISOString());
       await markCleaningVerificationPending();
-
-      if (nextRewardResult?.alreadyProcessed === true) {
-        router.replace('/' as Href);
-        return;
-      }
-
-      showRewardResult('cleaning', nextRewardResult);
+      router.replace('/' as Href);
     } catch (error) {
-      if (!didCompleteSession) {
-        completionStateRef.current = 'idle';
-      }
+      completionStateRef.current = 'idle';
       if (typeof __DEV__ !== 'undefined' && __DEV__) {
         console.warn('Failed to complete cleaning session.', error);
       }
-      Alert.alert('청소 완료를 저장할 수 없어요', '애프터 사진 저장에 실패했습니다. 다시 시도해 주세요.');
+      Alert.alert('청소 완료를 저장할 수 없어요', '사진을 처리하지 못했습니다. 다시 시도해 주세요.');
     } finally {
       setIsSaving(false);
     }
