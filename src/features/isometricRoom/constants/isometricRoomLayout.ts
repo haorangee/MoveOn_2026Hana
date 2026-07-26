@@ -7,9 +7,9 @@ export const ROOM_DESIGN_HEIGHT = 512;
 // assets/images/isometric-room/moveon-room-v1.png.
 export const vacuumCleanerLayout = {
   x: 166,
-  y: 152,
-  width: 104,
-  height: 208,
+  y: 114,
+  width: 96,
+  height: 205,
   zIndex: 18,
   rotation: '0deg',
 } satisfies Pick<
@@ -17,13 +17,13 @@ export const vacuumCleanerLayout = {
   'height' | 'rotation' | 'width' | 'x' | 'y' | 'zIndex'
 >;
 
-const VACUUM_CLEANER_HOTSPOT_PADDING = 6;
+const VACUUM_CLEANER_HOTSPOT_PADDING = 8;
 
 export const vacuumCleanerHotspotLayout = {
-  x: vacuumCleanerLayout.x + 26 - VACUUM_CLEANER_HOTSPOT_PADDING,
-  y: vacuumCleanerLayout.y + 12 - VACUUM_CLEANER_HOTSPOT_PADDING,
-  width: 54 + VACUUM_CLEANER_HOTSPOT_PADDING * 2,
-  height: 184 + VACUUM_CLEANER_HOTSPOT_PADDING * 2,
+  x: vacuumCleanerLayout.x - 6,
+  y: vacuumCleanerLayout.y + 36,
+  width: 88,
+  height: 138,
   zIndex: vacuumCleanerLayout.zIndex + 1,
   rotation: vacuumCleanerLayout.rotation,
 } satisfies Pick<
