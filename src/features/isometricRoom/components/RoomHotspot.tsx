@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { IsometricRoomRect } from '../types/isometricRoom';
 
 type RoomHotspotProps = {
+  accessibilityLabel?: string;
   label: string;
   layout: IsometricRoomRect;
   onPress: () => void;
@@ -10,6 +11,7 @@ type RoomHotspotProps = {
 };
 
 export function RoomHotspot({
+  accessibilityLabel,
   disabled = false,
   label,
   layout,
@@ -26,7 +28,7 @@ export function RoomHotspot({
   return (
     <Pressable
       accessibilityHint={`${label} 기능을 확인합니다.`}
-      accessibilityLabel={`${label} 터치 영역`}
+      accessibilityLabel={accessibilityLabel ?? `${label} 터치 영역`}
       accessibilityRole="button"
       disabled={disabled}
       hitSlop={6}

@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import {
   isometricRoomHotspots,
@@ -7,7 +8,12 @@ import {
 import { IsometricRoomArtwork } from './IsometricRoomArtwork';
 import { RoomHotspot } from './RoomHotspot';
 import { VacuumCleanerLayer } from './VacuumCleanerLayer';
-import type { IsometricRoomObjectId } from '../types/isometricRoom';
+import type {
+  IsometricRoomObjectId,
+  VacuumCleanerState,
+} from '../types/isometricRoom';
+
+const CLEANING_START_DELAY_MS = 400;
 
 type IsometricRoomSceneProps = {
   showDebugHotspots?: boolean;
@@ -18,12 +24,44 @@ export function IsometricRoomScene({
   onObjectPress,
   showDebugHotspots = false,
 }: IsometricRoomSceneProps) {
+  const [vacuumState, setVacuumState] = useState<VacuumCleanerState>('idle');
+  const [isStartingCleaning, setIsStartingCleaning] = useState(false);
+  const navigationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (navigationTimerRef.current) {
+      clearTimeout(navigationTimerRef.current);
+      navigationTimerRef.current = null;
+    }
+  }, []);
+
+  const handleObjectPress = (objectId: IsometricRoomObjectId, label: string) => {
+    if (objectId !== 'cleaningFloor') {
+      onObjectPress(objectId, label);
+      return;
+    }
+
+    if (isStartingCleaning) {
+      return;
+    }
+
+    setIsStartingCleaning(true);
+    setVacuumState('active');
+
+    navigationTimerRef.current = setTimeout(() => {
+      navigationTimerRef.current = null;
+      onObjectPress(objectId, label);
+      setVacuumState('idle');
+      setIsStartingCleaning(false);
+    }, CLEANING_START_DELAY_MS);
+  };
+
   return (
     <View style={styles.scene}>
       <View pointerEvents="none" style={styles.floatShadow} />
       <View style={styles.roomShell}>
         <IsometricRoomArtwork />
-        <VacuumCleanerLayer />
+        <VacuumCleanerLayer state={vacuumState} />
 
         {/* Future dynamic layers:
             CleaningStateLayer
@@ -36,15 +74,25 @@ export function IsometricRoomScene({
             SparkleLayer
         */}
 
-        {isometricRoomHotspots.map((object) => (
-          <RoomHotspot
-            key={`${object.id}-hotspot`}
-            label={object.label}
-            layout={object}
-            onPress={() => onObjectPress(object.id, object.label)}
-            showDebug={showDebugHotspots}
-          />
-        ))}
+        {isometricRoomHotspots.map((object) => {
+          if (object.id === 'cleaningFloor' && isStartingCleaning) {
+            return null;
+          }
+
+          return (
+            <RoomHotspot
+              accessibilityLabel={
+                object.id === 'cleaningFloor' ? '청소 시작하기' : undefined
+              }
+              disabled={object.id === 'cleaningFloor' && isStartingCleaning}
+              key={`${object.id}-hotspot`}
+              label={object.label}
+              layout={object}
+              onPress={() => handleObjectPress(object.id, object.label)}
+              showDebug={showDebugHotspots}
+            />
+          );
+        })}
       </View>
     </View>
   );

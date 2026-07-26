@@ -6,16 +6,20 @@
 moveon-room-v1.png
 ```
 
-## Dynamic object layer: vacuum cleaner
+## Dynamic object layer: vacuum cleaner idle/active
 
 ```text
-assets/images/isometric-room/objects/vacuum-cleaner-v1.png
+assets/images/isometric-room/objects/vacuum-cleaner-idle-v1.png
+assets/images/isometric-room/objects/vacuum-cleaner-active-v1.png
 ```
 
 The vacuum cleaner is not baked into the room background.
 It is rendered as a separate transparent PNG layer above the background and below the `cleaningFloor` hotspot.
 
-The vacuum cleaner image layer and the cleaning hotspot share `vacuumCleanerLayout` from:
+`vacuum-cleaner-idle-v1.png` is the default stored state next to the vanity wall.
+`vacuum-cleaner-active-v1.png` is shown briefly after the user taps the cleaner, before navigating to `/cleaning`.
+
+The vacuum cleaner image layer and the cleaning hotspot use state-specific layouts from:
 
 ```text
 src/features/isometricRoom/constants/isometricRoomLayout.ts

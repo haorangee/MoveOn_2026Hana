@@ -12,6 +12,8 @@ export type IsometricRoomObjectId =
   | 'character'
   | 'pet';
 
+export type VacuumCleanerState = 'idle' | 'active';
+
 export interface IsometricRoomRect {
   x: number;
   y: number;

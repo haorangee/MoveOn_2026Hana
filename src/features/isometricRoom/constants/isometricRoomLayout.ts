@@ -1,35 +1,51 @@
-import type { IsometricRoomObjectLayout } from '../types/isometricRoom';
+import type {
+  IsometricRoomObjectLayout,
+  VacuumCleanerState,
+} from '../types/isometricRoom';
 
 export const ROOM_DESIGN_WIDTH = 768;
 export const ROOM_DESIGN_HEIGHT = 512;
 
 // Hotspot positions use the 768 x 512 app coordinate system for
 // assets/images/isometric-room/moveon-room-v1.png.
-export const vacuumCleanerLayout = {
+type VacuumCleanerLayout = Pick<
+  IsometricRoomObjectLayout,
+  'height' | 'rotation' | 'width' | 'x' | 'y' | 'zIndex'
+>;
+
+export const vacuumCleanerIdleLayout = {
   x: 190,
   y: 145,
   width: 76,
   height: 190,
   zIndex: 18,
-  rotation: '22deg',
-} satisfies Pick<
-  IsometricRoomObjectLayout,
-  'height' | 'rotation' | 'width' | 'x' | 'y' | 'zIndex'
->;
+  rotation: '0deg',
+} satisfies VacuumCleanerLayout;
+
+export const vacuumCleanerActiveLayout = {
+  x: 454,
+  y: 242,
+  width: 150,
+  height: 225,
+  zIndex: 71,
+  rotation: '0deg',
+} satisfies VacuumCleanerLayout;
+
+export const vacuumCleanerLayouts = {
+  idle: vacuumCleanerIdleLayout,
+  active: vacuumCleanerActiveLayout,
+} satisfies Record<VacuumCleanerState, VacuumCleanerLayout>;
 
 const VACUUM_CLEANER_HOTSPOT_PADDING = 8;
 
-export const vacuumCleanerHotspotLayout = {
-  x: vacuumCleanerLayout.x + 2,
-  y: vacuumCleanerLayout.y + 18,
-  width: 70,
+export const vacuumCleanerIdleHotspotLayout = {
+  x: vacuumCleanerIdleLayout.x - VACUUM_CLEANER_HOTSPOT_PADDING,
+  y: vacuumCleanerIdleLayout.y + 18,
+  width: 70 + VACUUM_CLEANER_HOTSPOT_PADDING * 2,
   height: 156,
-  zIndex: vacuumCleanerLayout.zIndex + 1,
-  rotation: vacuumCleanerLayout.rotation,
-} satisfies Pick<
-  IsometricRoomObjectLayout,
-  'height' | 'rotation' | 'width' | 'x' | 'y' | 'zIndex'
->;
+  zIndex: vacuumCleanerIdleLayout.zIndex + 1,
+  rotation: vacuumCleanerIdleLayout.rotation,
+} satisfies VacuumCleanerLayout;
 
 export const isometricRoomObjects: IsometricRoomObjectLayout[] = [
   {
@@ -122,7 +138,7 @@ export const isometricRoomObjects: IsometricRoomObjectLayout[] = [
   {
     id: 'cleaningFloor',
     label: '청소',
-    ...vacuumCleanerHotspotLayout,
+    ...vacuumCleanerIdleHotspotLayout,
     interactive: true,
   },
   {
