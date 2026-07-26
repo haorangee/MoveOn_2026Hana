@@ -11,11 +11,24 @@ import {
   type LayoutChangeEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  MVP_CHARACTER_CATALOG,
+  MVP_CHARACTER_IDS,
+} from '@/features/customization/catalogs/characterCatalog';
+import {
+  MVP_PET_CATALOG,
+  MVP_PET_IDS,
+} from '@/features/customization/catalogs/petCatalog';
+import type {
+  MvpCharacterId,
+  MvpPetId,
+} from '@/features/customization/types/customization';
 import { IsometricRoomScene } from '../components/IsometricRoomScene';
 import {
   ROOM_DESIGN_HEIGHT,
   ROOM_DESIGN_WIDTH,
 } from '../constants/isometricRoomLayout';
+import { useIsometricRoomProfile } from '../hooks/useIsometricRoomProfile';
 import type { IsometricRoomObjectId } from '../types/isometricRoom';
 
 type ViewportSize = {
@@ -34,8 +47,12 @@ const routeByObject: Partial<Record<IsometricRoomObjectId, Href>> = {
 
 export default function IsometricRoomPreviewScreen() {
   const router = useRouter();
+  const profile = useIsometricRoomProfile();
   const [viewport, setViewport] = useState<ViewportSize>({ width: 0, height: 0 });
   const [showDebugHotspots, setShowDebugHotspots] = useState(false);
+  const [showAvatarPanel, setShowAvatarPanel] = useState(false);
+  const [previewCharacterId, setPreviewCharacterId] = useState<MvpCharacterId | null>(null);
+  const [previewPetId, setPreviewPetId] = useState<MvpPetId | null>(null);
   const [waterNoticeVisible, setWaterNoticeVisible] = useState(false);
   const [routeNotice, setRouteNotice] = useState<string | null>(null);
 
@@ -57,6 +74,35 @@ export default function IsometricRoomPreviewScreen() {
     setViewport((current) => (
       current.width === width && current.height === height ? current : { width, height }
     ));
+  };
+
+  const currentCharacterId = previewCharacterId ?? profile.characterId;
+  const currentPetId = previewPetId ?? profile.petId;
+  const currentCharacter = MVP_CHARACTER_CATALOG.find((item) => item.id === currentCharacterId)
+    ?? MVP_CHARACTER_CATALOG[0];
+  const currentPet = MVP_PET_CATALOG.find((item) => item.id === currentPetId)
+    ?? MVP_PET_CATALOG[0];
+
+  const moveCharacterPreview = (direction: 1 | -1) => {
+    setPreviewCharacterId((current) => {
+      const currentIndex = MVP_CHARACTER_IDS.indexOf(current ?? profile.characterId);
+      const nextIndex = (currentIndex + direction + MVP_CHARACTER_IDS.length)
+        % MVP_CHARACTER_IDS.length;
+      return MVP_CHARACTER_IDS[nextIndex];
+    });
+  };
+
+  const movePetPreview = (direction: 1 | -1) => {
+    setPreviewPetId((current) => {
+      const currentIndex = MVP_PET_IDS.indexOf(current ?? profile.petId);
+      const nextIndex = (currentIndex + direction + MVP_PET_IDS.length) % MVP_PET_IDS.length;
+      return MVP_PET_IDS[nextIndex];
+    });
+  };
+
+  const restoreProfileAvatar = () => {
+    setPreviewCharacterId(null);
+    setPreviewPetId(null);
   };
 
   const openRoute = (objectId: IsometricRoomObjectId, label: string) => {
@@ -108,6 +154,22 @@ export default function IsometricRoomPreviewScreen() {
             HIT
           </Text>
         </Pressable>
+        {__DEV__ ? (
+          <Pressable
+            accessibilityLabel="AVATAR 개발 패널 열기"
+            accessibilityRole="button"
+            onPress={() => setShowAvatarPanel((current) => !current)}
+            style={({ pressed }) => [
+              styles.debugToggle,
+              showAvatarPanel && styles.avatarToggleActive,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={[styles.debugToggleText, showAvatarPanel && styles.avatarToggleTextActive]}>
+              AVATAR
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <View onLayout={handleSceneLayout} style={styles.previewArea}>
@@ -131,12 +193,66 @@ export default function IsometricRoomPreviewScreen() {
             ]}
           >
             <IsometricRoomScene
+              characterIdOverride={previewCharacterId}
               onObjectPress={openRoute}
+              petIdOverride={previewPetId}
               showDebugHotspots={showDebugHotspots}
             />
           </View>
         </View>
       </View>
+
+      {__DEV__ && showAvatarPanel ? (
+        <View style={styles.avatarPanel}>
+          <View style={styles.avatarRow}>
+            <Text style={styles.avatarLabel}>캐릭터</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => moveCharacterPreview(-1)}
+              style={({ pressed }) => [styles.avatarStepButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.avatarStepText}>이전</Text>
+            </Pressable>
+            <Text numberOfLines={1} style={styles.avatarValue}>
+              {currentCharacter.id} · {currentCharacter.displayName}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => moveCharacterPreview(1)}
+              style={({ pressed }) => [styles.avatarStepButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.avatarStepText}>다음</Text>
+            </Pressable>
+          </View>
+          <View style={styles.avatarRow}>
+            <Text style={styles.avatarLabel}>펫</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => movePetPreview(-1)}
+              style={({ pressed }) => [styles.avatarStepButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.avatarStepText}>이전</Text>
+            </Pressable>
+            <Text numberOfLines={1} style={styles.avatarValue}>
+              {currentPet.id} · {currentPet.displayName}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => movePetPreview(1)}
+              style={({ pressed }) => [styles.avatarStepButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.avatarStepText}>다음</Text>
+            </Pressable>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={restoreProfileAvatar}
+            style={({ pressed }) => [styles.avatarRestoreButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.avatarRestoreText}>프로필 값으로 복원</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>방 안의 물건을 눌러 기능 연결을 확인해 보세요.</Text>
@@ -250,6 +366,10 @@ const styles = StyleSheet.create({
     borderColor: '#82A0C9',
     backgroundColor: '#DCEBFF',
   },
+  avatarToggleActive: {
+    borderColor: '#A586BE',
+    backgroundColor: '#F1E5FF',
+  },
   debugToggleText: {
     color: '#827266',
     fontSize: 11,
@@ -257,6 +377,9 @@ const styles = StyleSheet.create({
   },
   debugToggleTextActive: {
     color: '#3E648F',
+  },
+  avatarToggleTextActive: {
+    color: '#704D8E',
   },
   previewArea: {
     height: '46%',
@@ -296,6 +419,61 @@ const styles = StyleSheet.create({
     color: '#A08E7E',
     fontSize: 10,
     fontWeight: '700',
+  },
+  avatarPanel: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E3D6C5',
+    backgroundColor: 'rgba(255, 253, 248, 0.96)',
+    gap: 8,
+  },
+  avatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  avatarLabel: {
+    width: 48,
+    color: '#554A3D',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  avatarStepButton: {
+    minWidth: 44,
+    minHeight: 32,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EFE5D7',
+  },
+  avatarStepText: {
+    color: '#51433A',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  avatarValue: {
+    flex: 1,
+    color: '#6D5F54',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  avatarRestoreButton: {
+    alignSelf: 'flex-end',
+    minHeight: 34,
+    paddingHorizontal: 12,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#7D8D62',
+  },
+  avatarRestoreText: {
+    color: '#FFF9EF',
+    fontSize: 11,
+    fontWeight: '900',
   },
   pressed: {
     opacity: 0.82,

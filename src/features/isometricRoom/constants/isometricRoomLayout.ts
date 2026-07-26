@@ -47,6 +47,22 @@ export const vacuumCleanerIdleHotspotLayout = {
   rotation: vacuumCleanerIdleLayout.rotation,
 } satisfies VacuumCleanerLayout;
 
+export const isometricCharacterLayout = {
+  x: 384,
+  y: 332,
+  width: 96,
+  height: 128,
+  zIndex: 72,
+} satisfies VacuumCleanerLayout;
+
+export const isometricPetLayout = {
+  x: 482,
+  y: 398,
+  width: 58,
+  height: 58,
+  zIndex: 73,
+} satisfies VacuumCleanerLayout;
+
 export const isometricRoomObjects: IsometricRoomObjectLayout[] = [
   {
     id: 'bed',

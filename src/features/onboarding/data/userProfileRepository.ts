@@ -46,6 +46,9 @@ export async function loadUserProfile(userId: string): Promise<UserProfile | nul
     age: data.age,
     birthDate: resolveBirthDate(data.birthDate, data.age),
     petSpecies: data.petSpecies as UserProfile['petSpecies'],
+    petId: typeof data.petId === 'string' && data.petId.trim()
+      ? data.petId.trim()
+      : null,
     petName: typeof data.petName === 'string' && data.petName.trim()
       ? data.petName.trim()
       : '마루',

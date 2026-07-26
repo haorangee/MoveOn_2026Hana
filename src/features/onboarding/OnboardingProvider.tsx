@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 import type { UserProfile } from '@/contracts/user-profile';
+import type { MvpPetId } from '@/features/customization/types/customization';
 import { useAuth } from '@/features/auth/AuthProvider';
 import {
   recordFirebaseLogin,
@@ -36,6 +37,7 @@ export type MoveOnProfile = {
   age: number;
   birthDate: string;
   petSpecies: PetSpecies;
+  petId?: MvpPetId | string | null;
   petName: string;
   characterId: CharacterId;
   chapter: ChapterId;
@@ -52,6 +54,7 @@ const initialProfile: MoveOnProfile = {
   age: 20,
   birthDate: birthDateFromAge(20),
   petSpecies: 'dog',
+  petId: null,
   petName: '',
   characterId: 'daily',
   chapter: 'general',
@@ -87,6 +90,9 @@ function normalizeProfile(value: unknown): MoveOnProfile | null {
     age: profile.age,
     birthDate: resolveBirthDate(profile.birthDate, profile.age),
     petSpecies: profile.petSpecies as PetSpecies,
+    petId: typeof profile.petId === 'string' && profile.petId.trim()
+      ? profile.petId.trim()
+      : null,
     petName: typeof profile.petName === 'string' && profile.petName.trim()
       ? profile.petName.trim()
       : LEGACY_PET_NAME,
@@ -145,6 +151,7 @@ function toUserProfile(profile: MoveOnProfile): UserProfile {
     age: profile.age,
     birthDate: profile.birthDate,
     petSpecies: profile.petSpecies,
+    petId: profile.petId ?? null,
     petName: profile.petName,
     characterId: profile.characterId,
     chapter: profile.chapter,
@@ -163,6 +170,7 @@ function toMoveOnProfile(profile: UserProfile): MoveOnProfile {
     age: profile.age,
     birthDate: profile.birthDate,
     petSpecies: profile.petSpecies,
+    petId: profile.petId ?? null,
     petName: profile.petName,
     characterId: profile.characterId,
     chapter: profile.chapter,

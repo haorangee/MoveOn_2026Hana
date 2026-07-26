@@ -5,9 +5,12 @@ import {
   ROOM_DESIGN_HEIGHT,
   ROOM_DESIGN_WIDTH,
 } from '../constants/isometricRoomLayout';
+import { IsometricCharacterLayer } from './IsometricCharacterLayer';
+import { IsometricPetLayer } from './IsometricPetLayer';
 import { IsometricRoomArtwork } from './IsometricRoomArtwork';
 import { RoomHotspot } from './RoomHotspot';
 import { VacuumCleanerLayer } from './VacuumCleanerLayer';
+import { useIsometricRoomProfile } from '../hooks/useIsometricRoomProfile';
 import type {
   IsometricRoomObjectId,
   VacuumCleanerState,
@@ -16,14 +19,21 @@ import type {
 const CLEANING_START_DELAY_MS = 400;
 
 type IsometricRoomSceneProps = {
+  characterIdOverride?: string | null;
+  petIdOverride?: string | null;
   showDebugHotspots?: boolean;
   onObjectPress: (objectId: IsometricRoomObjectId, label: string) => void;
 };
 
 export function IsometricRoomScene({
+  characterIdOverride,
   onObjectPress,
+  petIdOverride,
   showDebugHotspots = false,
 }: IsometricRoomSceneProps) {
+  const profile = useIsometricRoomProfile();
+  const characterId = characterIdOverride ?? profile.characterId;
+  const petId = petIdOverride ?? profile.petId;
   const [vacuumState, setVacuumState] = useState<VacuumCleanerState>('idle');
   const [isStartingCleaning, setIsStartingCleaning] = useState(false);
   const navigationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -62,6 +72,11 @@ export function IsometricRoomScene({
       <View style={styles.roomShell}>
         <IsometricRoomArtwork />
         <VacuumCleanerLayer state={vacuumState} />
+        <IsometricCharacterLayer characterId={characterId} />
+        <IsometricPetLayer
+          petId={petId}
+          petSpecies={profile.petSpecies}
+        />
 
         {/* Future dynamic layers:
             CleaningStateLayer
@@ -69,8 +84,6 @@ export function IsometricRoomScene({
             StudyBooksLayer
             QuestBoardLayer
             NewspaperLayer
-            CharacterLayer
-            PetLayer
             SparkleLayer
         */}
 
