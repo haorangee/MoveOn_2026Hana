@@ -6,6 +6,21 @@
 moveon-room-v1.png
 ```
 
+## Dynamic object layer: vacuum cleaner
+
+```text
+assets/images/isometric-room/objects/vacuum-cleaner-v1.png
+```
+
+The vacuum cleaner is not baked into the room background.
+It is rendered as a separate transparent PNG layer above the background and below the `cleaningFloor` hotspot.
+
+The vacuum cleaner image layer and the cleaning hotspot share `vacuumCleanerLayout` from:
+
+```text
+src/features/isometricRoom/constants/isometricRoomLayout.ts
+```
+
 ## 권장 제작 크기
 
 ```text

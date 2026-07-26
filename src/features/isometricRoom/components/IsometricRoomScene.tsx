@@ -6,6 +6,7 @@ import {
 } from '../constants/isometricRoomLayout';
 import { IsometricRoomArtwork } from './IsometricRoomArtwork';
 import { RoomHotspot } from './RoomHotspot';
+import { VacuumCleanerLayer } from './VacuumCleanerLayer';
 import type { IsometricRoomObjectId } from '../types/isometricRoom';
 
 type IsometricRoomSceneProps = {
@@ -22,6 +23,7 @@ export function IsometricRoomScene({
       <View pointerEvents="none" style={styles.floatShadow} />
       <View style={styles.roomShell}>
         <IsometricRoomArtwork />
+        <VacuumCleanerLayer />
 
         {/* Future dynamic layers:
             CleaningStateLayer

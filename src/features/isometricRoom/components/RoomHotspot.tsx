@@ -19,6 +19,9 @@ export function RoomHotspot({
   const zIndex = 'zIndex' in layout && typeof layout.zIndex === 'number'
     ? layout.zIndex
     : undefined;
+  const transform = 'rotation' in layout && typeof layout.rotation === 'string'
+    ? [{ rotate: layout.rotation }]
+    : undefined;
 
   return (
     <Pressable
@@ -37,6 +40,7 @@ export function RoomHotspot({
           height: layout.height,
           zIndex,
           elevation: zIndex,
+          transform,
         },
         showDebug && styles.debug,
         pressed && styles.pressed,
