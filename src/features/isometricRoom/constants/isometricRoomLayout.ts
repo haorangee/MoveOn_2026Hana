@@ -6,11 +6,12 @@ export const ROOM_DESIGN_HEIGHT = 512;
 // Hotspot positions use the 768 x 512 app coordinate system for
 // assets/images/isometric-room/moveon-room-v1.png.
 export const vacuumCleanerLayout = {
-  x: 466,
-  y: 238,
-  width: 158,
-  height: 237,
-  zIndex: 71,
+  x: 166,
+  y: 152,
+  width: 104,
+  height: 208,
+  zIndex: 18,
+  rotation: '0deg',
 } satisfies Pick<
   IsometricRoomObjectLayout,
   'height' | 'rotation' | 'width' | 'x' | 'y' | 'zIndex'
@@ -19,12 +20,12 @@ export const vacuumCleanerLayout = {
 const VACUUM_CLEANER_HOTSPOT_PADDING = 6;
 
 export const vacuumCleanerHotspotLayout = {
-  x: vacuumCleanerLayout.x + 40 - VACUUM_CLEANER_HOTSPOT_PADDING,
-  y: vacuumCleanerLayout.y + 14 - VACUUM_CLEANER_HOTSPOT_PADDING,
-  width: 68 + VACUUM_CLEANER_HOTSPOT_PADDING * 2,
-  height: 214 + VACUUM_CLEANER_HOTSPOT_PADDING * 2,
+  x: vacuumCleanerLayout.x + 26 - VACUUM_CLEANER_HOTSPOT_PADDING,
+  y: vacuumCleanerLayout.y + 12 - VACUUM_CLEANER_HOTSPOT_PADDING,
+  width: 54 + VACUUM_CLEANER_HOTSPOT_PADDING * 2,
+  height: 184 + VACUUM_CLEANER_HOTSPOT_PADDING * 2,
   zIndex: vacuumCleanerLayout.zIndex + 1,
-  rotation: '26deg',
+  rotation: vacuumCleanerLayout.rotation,
 } satisfies Pick<
   IsometricRoomObjectLayout,
   'height' | 'rotation' | 'width' | 'x' | 'y' | 'zIndex'

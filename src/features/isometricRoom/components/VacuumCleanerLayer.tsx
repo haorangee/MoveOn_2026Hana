@@ -24,6 +24,7 @@ const styles = StyleSheet.create({
     height: vacuumCleanerLayout.height,
     zIndex: vacuumCleanerLayout.zIndex,
     elevation: vacuumCleanerLayout.zIndex,
+    transform: [{ rotate: vacuumCleanerLayout.rotation }],
   },
   artwork: {
     width: '100%',
