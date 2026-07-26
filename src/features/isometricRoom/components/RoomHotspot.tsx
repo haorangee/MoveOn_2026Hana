@@ -16,6 +16,10 @@ export function RoomHotspot({
   onPress,
   showDebug = false,
 }: RoomHotspotProps) {
+  const zIndex = 'zIndex' in layout && typeof layout.zIndex === 'number'
+    ? layout.zIndex
+    : undefined;
+
   return (
     <Pressable
       accessibilityHint={`${label} 기능을 확인합니다.`}
@@ -31,6 +35,8 @@ export function RoomHotspot({
           top: layout.y,
           width: layout.width,
           height: layout.height,
+          zIndex,
+          elevation: zIndex,
         },
         showDebug && styles.debug,
         pressed && styles.pressed,

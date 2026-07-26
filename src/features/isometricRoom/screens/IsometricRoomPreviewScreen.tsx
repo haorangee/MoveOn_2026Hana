@@ -259,9 +259,9 @@ const styles = StyleSheet.create({
     color: '#3E648F',
   },
   previewArea: {
-    height: '60%',
-    minHeight: 330,
-    maxHeight: 520,
+    height: '46%',
+    minHeight: 300,
+    maxHeight: 420,
     marginHorizontal: 8,
     marginTop: 2,
     marginBottom: 4,
