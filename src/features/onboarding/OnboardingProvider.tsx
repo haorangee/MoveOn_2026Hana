@@ -16,7 +16,7 @@ import {
 } from '@/features/auth/firebaseLoginRecords';
 import { birthDateFromAge, resolveBirthDate } from '@/features/onboarding/birthDate';
 import type { ChapterId } from '@/features/onboarding/domain/onboardingState';
-import type { CharacterId, PetSpecies } from '@/features/onboarding/onboardingData';
+import type { PetSpecies } from '@/features/onboarding/onboardingData';
 import { onboardingRepository } from '@/features/onboarding/data/onboardingRepository';
 import {
   deleteUserProfile,
@@ -39,7 +39,7 @@ export type MoveOnProfile = {
   petSpecies: PetSpecies;
   petId?: MvpPetId | string | null;
   petName: string;
-  characterId: CharacterId;
+  characterId: string;
   chapter: ChapterId;
   magazineNotificationEnabled: boolean;
   totalXp: number;
@@ -96,7 +96,7 @@ function normalizeProfile(value: unknown): MoveOnProfile | null {
     petName: typeof profile.petName === 'string' && profile.petName.trim()
       ? profile.petName.trim()
       : LEGACY_PET_NAME,
-    characterId: profile.characterId as CharacterId,
+    characterId: profile.characterId,
     chapter: profile.chapter === 'college'
       || profile.chapter === 'job-seeker'
       || profile.chapter === 'worker'

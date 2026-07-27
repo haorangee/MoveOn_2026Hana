@@ -11,6 +11,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { calculateAge } from '@/features/onboarding/birthDate';
+import { isMvpCharacterId } from '@/features/customization/catalogs/characterCatalog';
+import {
+  getMvpPetCatalogItem,
+  isMvpPetId,
+} from '@/features/customization/catalogs/petCatalog';
 import { OnboardingProgress } from '@/features/onboarding/components/OnboardingProgress';
 import { useOnboarding } from '@/features/onboarding/OnboardingProvider';
 import { FirstActionTutorialPage } from '@/features/onboarding/pages/FirstActionTutorialPage';
@@ -32,6 +37,7 @@ export function OnboardingScreen() {
       nickname: profile.name,
       birthDate: profile.birthDate,
       selectedPetSpecies: profile.petSpecies,
+      selectedPetId: isMvpPetId(profile.petId) ? profile.petId : null,
       petName: profile.petName,
       selectedCharacterId: profile.characterId,
       selectedChapter: profile.chapter,
@@ -67,13 +73,18 @@ export function OnboardingScreen() {
   const finishOnboarding = useCallback(async () => {
     if (!replay) {
       const birthDate = state.birthDate || profile.birthDate;
+      const selectedPet = getMvpPetCatalogItem(state.selectedPetId, state.selectedPetSpecies);
+      const selectedCharacterId = isMvpCharacterId(state.selectedCharacterId)
+        ? state.selectedCharacterId
+        : 'female-01';
       await completeOnboarding({
         name: state.nickname.trim() || 'MoveOn 사용자',
         age: calculateAge(birthDate),
         birthDate,
-        petSpecies: state.selectedPetSpecies,
+        petSpecies: selectedPet.species,
+        petId: selectedPet.id,
         petName: state.petName.trim(),
-        characterId: state.selectedCharacterId,
+        characterId: selectedCharacterId,
         chapter: state.selectedChapter,
         magazineNotificationEnabled: state.magazineNotificationEnabled === true,
         totalXp: profile.totalXp ?? 0,

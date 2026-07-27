@@ -40,7 +40,7 @@ const nextPreparationStep: Partial<Record<FirstActionStep, FirstActionStep>> = {
 };
 
 type FirstActionTutorialPageProps = {
-  characterId: CharacterId;
+  characterId: string;
   firstBookCreated: boolean;
   petSpecies: PetSpecies;
   onBookCreated: () => void;
