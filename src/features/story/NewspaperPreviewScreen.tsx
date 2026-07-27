@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -35,17 +34,6 @@ const PIXEL_BORDER_COLORS = [
 
 type PixelBorderColorId = (typeof PIXEL_BORDER_COLORS)[number]['id'];
 
-const PIXEL_NEWS_ASSETS = {
-  home: require('../../../assets/images/news/pixel-home.png'),
-  book: require('../../../assets/images/news/pixel-book.png'),
-  water: require('../../../assets/images/news/pixel-water.png'),
-  broom: require('../../../assets/images/news/pixel-broom.png'),
-  shower: require('../../../assets/images/news/pixel-shower.png'),
-  studyShelf: require('../../../assets/images/news/pixel-study-shelf.png'),
-  plant: require('../../../assets/images/news/pixel-plant.png'),
-  dog: require('../../../assets/images/news/pixel-dog.png'),
-};
-
 type GenerateNewsResponse = {
   news?: unknown;
   fallbackNews?: unknown;
@@ -66,52 +54,6 @@ function buildRequestBody(summary: NewsActivitySummary) {
   return { userName, activities };
 }
 
-function PixelIllustration({
-  type,
-}: {
-  type: 'home' | 'study' | 'life';
-}) {
-  if (type === 'home') {
-    return (
-      <Image
-        resizeMode="contain"
-        source={PIXEL_NEWS_ASSETS.home}
-        style={styles.pixelHomeImage}
-      />
-    );
-  }
-
-  if (type === 'study') {
-    return (
-      <Image
-        resizeMode="contain"
-        source={PIXEL_NEWS_ASSETS.studyShelf}
-        style={styles.pixelStudyImage}
-      />
-    );
-  }
-
-  return (
-    <View style={styles.pixelLifeImageGroup}>
-      <Image
-        resizeMode="contain"
-        source={PIXEL_NEWS_ASSETS.plant}
-        style={styles.pixelPlantImage}
-      />
-      <Image
-        resizeMode="contain"
-        source={PIXEL_NEWS_ASSETS.water}
-        style={styles.pixelWaterImage}
-      />
-      <Image
-        resizeMode="contain"
-        source={PIXEL_NEWS_ASSETS.dog}
-        style={styles.pixelDogImage}
-      />
-    </View>
-  );
-}
-
 function PixelNewspaperCard({
   news,
   summary,
@@ -127,81 +69,104 @@ function PixelNewspaperCard({
   const waterCount = summary?.waterCount ?? 0;
   const cleaningCount = summary?.cleaningCount ?? 0;
   const showerMinutes = summary?.showerMinutes ?? 0;
+  const userName = summary?.userName ?? 'MoveOn 주민';
+  const periodLabel = summary
+    ? `${summary.periodStart} ~ ${summary.periodEnd}`
+    : news.dateLabel;
 
   return (
     <View style={[
-      styles.pixelFrame,
+      styles.pixelNewspaperShell,
       { backgroundColor: borderBackground, borderColor },
     ]}
     >
-      <View style={[styles.pixelPaper, { borderColor }]}>
-        <View style={styles.pixelMastheadRow}>
-          <Text style={styles.pixelSparkle}>✣</Text>
-          <Text numberOfLines={1} style={styles.pixelMasthead}>MOVEON TIMES</Text>
-          <Text style={styles.pixelSparkle}>✣</Text>
-          <View style={styles.pixelIssue}>
-            <Text style={styles.pixelIssueText}>{summary?.periodStart ?? news.dateLabel}</Text>
-            <Text style={styles.pixelIssueText}>~ {summary?.periodEnd ?? news.dateLabel}</Text>
-            <Text style={styles.pixelEditionText}>SPECIAL EDITION</Text>
-          </View>
-        </View>
-        <View style={styles.pixelTagline}>
-          <Text style={styles.pixelTaglineText}>✣ 작은 행동이 오늘의 역사가 됩니다 ✣</Text>
+      <View style={styles.pixelNewspaperPage}>
+        <View style={styles.pixelTopRule} />
+        <View style={styles.pixelMastheadBlock}>
+          <Text
+            adjustsFontSizeToFit
+            numberOfLines={1}
+            style={styles.pixelDynamicMasthead}
+          >
+            MoveOn Times
+          </Text>
         </View>
 
-        <View style={styles.pixelLeadRow}>
-          <View style={styles.pixelLeadText}>
-            <Text style={styles.pixelSectionBadge}>오늘의 특보</Text>
-            <Text style={styles.pixelHeadline}>{news.mainHeadline}</Text>
-            <View style={styles.pixelDottedRule} />
-            <Text style={styles.pixelSubheadline}>{news.mainSubheadline}</Text>
-          </View>
-          <PixelIllustration type="home" />
-        </View>
-
-        <View style={styles.pixelStatsRow}>
-          <View style={styles.pixelStatBox}>
-            <Text style={styles.pixelStatValue}>{formatNumber(studyMinutes)}</Text>
-            <Image resizeMode="contain" source={PIXEL_NEWS_ASSETS.book} style={styles.pixelStatImage} />
-            <Text style={styles.pixelStatLabel}>공부 분</Text>
-          </View>
-          <View style={styles.pixelStatBox}>
-            <Text style={styles.pixelStatValue}>{waterCount}</Text>
-            <Image resizeMode="contain" source={PIXEL_NEWS_ASSETS.water} style={styles.pixelStatImage} />
-            <Text style={styles.pixelStatLabel}>물 잔</Text>
-          </View>
-          <View style={styles.pixelStatBox}>
-            <Text style={styles.pixelStatValue}>{cleaningCount}</Text>
-            <Image resizeMode="contain" source={PIXEL_NEWS_ASSETS.broom} style={styles.pixelStatImage} />
-            <Text style={styles.pixelStatLabel}>청소회</Text>
-          </View>
-          <View style={styles.pixelStatBox}>
-            <Text style={styles.pixelStatValue}>{formatNumber(showerMinutes)}</Text>
-            <Image resizeMode="contain" source={PIXEL_NEWS_ASSETS.shower} style={styles.pixelStatImage} />
-            <Text style={styles.pixelStatLabel}>샤워 분</Text>
+        <View style={styles.pixelMetaBar}>
+          <Text style={styles.pixelMetaText}>No. M5650</Text>
+          <Text style={styles.pixelMetaText}>DAILY NEWS FOR BETTER ME</Text>
+          <View style={styles.pixelMetaIssue}>
+            <Text style={styles.pixelMetaText}>{periodLabel}</Text>
+            <Text style={styles.pixelEditionLabel}>SPECIAL EDITION</Text>
           </View>
         </View>
 
-        <View style={styles.pixelArticleRow}>
-          <View style={styles.pixelArticleCopy}>
-            <Text style={styles.pixelSectionBadge}>공부면</Text>
-            <Text style={styles.pixelArticleHeadline}>{news.studyHeadline}</Text>
-            <Text style={styles.pixelArticleText}>{news.studySubheadline}</Text>
-          </View>
-          <PixelIllustration type="study" />
+        <View style={styles.pixelSloganBar}>
+          <Text style={styles.pixelSloganText}>작은 행동이 오늘의 역사가 됩니다</Text>
         </View>
 
-        <View style={styles.pixelArticleRow}>
-          <View style={styles.pixelArticleCopy}>
-            <Text style={styles.pixelSectionBadge}>생활면</Text>
-            <Text style={styles.pixelArticleHeadline}>{news.lifeHeadline}</Text>
-            <Text style={styles.pixelArticleText}>{news.lifeSubheadline}</Text>
-          </View>
-          <PixelIllustration type="life" />
+        <View style={styles.pixelLeadBlock}>
+          <Text style={styles.pixelMainKicker}>오늘의 특보</Text>
+          <Text style={styles.pixelDynamicHeadline}>{news.mainHeadline}</Text>
+          <Text style={styles.pixelDynamicSubheadline}>{news.mainSubheadline}</Text>
         </View>
 
-        <View style={styles.pixelFooter}>
-          <Text style={styles.pixelFooterText}>✣ {news.closingMessage} ✣</Text>
+        <View style={styles.pixelDynamicStatsRow}>
+          <View style={styles.pixelDynamicStatBox}>
+            <Text style={styles.pixelDynamicStatValue}>{formatNumber(studyMinutes)}</Text>
+            <Text style={styles.pixelDynamicStatLabel}>공부 분</Text>
+          </View>
+          <View style={styles.pixelDynamicStatBox}>
+            <Text style={styles.pixelDynamicStatValue}>{waterCount}</Text>
+            <Text style={styles.pixelDynamicStatLabel}>물 잔</Text>
+          </View>
+          <View style={styles.pixelDynamicStatBox}>
+            <Text style={styles.pixelDynamicStatValue}>{cleaningCount}</Text>
+            <Text style={styles.pixelDynamicStatLabel}>청소 회</Text>
+          </View>
+          <View style={styles.pixelDynamicStatBox}>
+            <Text style={styles.pixelDynamicStatValue}>{formatNumber(showerMinutes)}</Text>
+            <Text style={styles.pixelDynamicStatLabel}>샤워 분</Text>
+          </View>
+        </View>
+
+        <View style={styles.pixelArticleGrid}>
+          <View style={styles.pixelArticleCard}>
+            <View style={styles.pixelArticleCopy}>
+              <Text style={styles.pixelKicker}>공부면</Text>
+              <Text style={styles.pixelArticleTitle}>{news.studyHeadline}</Text>
+              <Text style={styles.pixelArticleBody}>{news.studySubheadline}</Text>
+            </View>
+          </View>
+
+          <View style={styles.pixelArticleCard}>
+            <View style={styles.pixelArticleCopy}>
+              <Text style={styles.pixelKicker}>생활면</Text>
+              <Text style={styles.pixelArticleTitle}>{news.lifeHeadline}</Text>
+              <Text style={styles.pixelArticleBody}>{news.lifeSubheadline}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.pixelSpecialRow}>
+          <View style={styles.pixelSmallArticle}>
+            <Text style={styles.pixelTinySection}>★ SPECIAL REPORT ★</Text>
+            <Text style={styles.pixelSmallArticleTitle}>작은 행동 누적 중</Text>
+            <Text style={styles.pixelSideText}>
+              공부 {formatNumber(studyMinutes)}분, 물 {waterCount}잔, 청소 {cleaningCount}회,
+              샤워 {formatNumber(showerMinutes)}분이 오늘 신문에 실렸어요.
+            </Text>
+          </View>
+          <View style={styles.pixelSmallArticle}>
+            <Text style={styles.pixelTinySection}>★ EDITOR'S NOTE ★</Text>
+            <Text style={styles.pixelSideText}>{news.closingMessage}</Text>
+          </View>
+        </View>
+
+        <View style={styles.pixelFooterLine}>
+          <Text style={styles.pixelFooterTiny}>SPECIAL ISSUE</Text>
+          <Text style={styles.pixelFooterQuote}>작은 습관이 만드는 큰 변화</Text>
+          <Text style={styles.pixelFooterTiny}>MOVE FORWARD, MOVE ON</Text>
         </View>
       </View>
     </View>
@@ -696,9 +661,286 @@ const styles = StyleSheet.create({
     color: '#3F372E',
     fontWeight: '900',
   },
-  pixelFrame: {
+  pixelNewspaperShell: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
+    padding: 4,
+    borderWidth: 2,
+    shadowColor: '#2B261F',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    elevation: 7,
+  },
+  pixelNewspaperPage: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#ECE5D3',
+    borderWidth: 1,
+    borderColor: '#4A463A',
+  },
+  pixelTopRule: {
+    height: 1,
+    backgroundColor: '#2B2923',
+    marginBottom: 8,
+  },
+  pixelMastheadBlock: {
+    minHeight: 66,
+    justifyContent: 'center',
+  },
+  pixelDynamicMasthead: {
+    color: '#171613',
+    fontFamily: 'serif',
+    fontSize: 43,
+    lineHeight: 50,
+    fontWeight: '900',
+    letterSpacing: 0,
+    textAlign: 'center',
+  },
+  pixelMetaBar: {
+    minHeight: 27,
+    paddingVertical: 4,
+    borderTopWidth: 2,
+    borderBottomWidth: 1,
+    borderColor: '#29271F',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  pixelMetaText: {
+    color: '#302D26',
+    fontFamily: 'serif',
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '700',
+  },
+  pixelMetaIssue: {
+    alignItems: 'flex-end',
+  },
+  pixelEditionLabel: {
+    color: '#3F3473',
+    fontFamily: 'serif',
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '800',
+  },
+  pixelSloganBar: {
+    minHeight: 31,
+    borderBottomWidth: 3,
+    borderColor: '#2B2923',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pixelSloganText: {
+    color: '#514A3C',
+    fontFamily: 'serif',
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  pixelLeadBlock: {
+    minHeight: 158,
+    paddingHorizontal: 0,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderColor: '#4F493E',
+    justifyContent: 'center',
+  },
+  pixelMainKicker: {
+    alignSelf: 'flex-start',
+    marginBottom: 9,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    backgroundColor: '#6C5694',
+    color: '#F9F4E8',
+    fontFamily: 'serif',
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '900',
+  },
+  pixelTinySection: {
+    color: '#25231E',
+    fontFamily: 'serif',
+    fontSize: 8,
+    lineHeight: 11,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  pixelSideHeadline: {
+    marginTop: 8,
+    color: '#161411',
+    fontFamily: 'serif',
+    fontSize: 14,
+    lineHeight: 17,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  pixelSideText: {
+    marginTop: 8,
+    color: '#343029',
+    fontFamily: 'serif',
+    fontSize: 8,
+    lineHeight: 12,
+    fontWeight: '700',
+  },
+  pixelMainColumn: {
+    flex: 1,
+    minHeight: 171,
+    borderWidth: 1,
+    borderColor: '#4F493E',
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
+  pixelLeadCopy: {
+    flex: 1,
+    paddingHorizontal: 7,
+    paddingVertical: 8,
+  },
+  pixelKicker: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: '#6C5694',
+    color: '#F9F4E8',
+    fontFamily: 'serif',
+    fontSize: 8,
+    lineHeight: 11,
+    fontWeight: '900',
+  },
+  pixelDynamicHeadline: {
+    color: '#171613',
+    fontFamily: 'serif',
+    fontSize: 29,
+    lineHeight: 36,
+    fontWeight: '900',
+  },
+  pixelDynamicSubheadline: {
+    marginTop: 11,
+    color: '#312D25',
+    fontFamily: 'serif',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '800',
+  },
+  pixelLeadImageBox: {
+    width: '42%',
+    padding: 5,
+    borderLeftWidth: 1,
+    borderColor: '#4F493E',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#DDD3BD',
+  },
+  pixelDynamicStatsRow: {
+    minHeight: 68,
+    flexDirection: 'row',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#4F493E',
+  },
+  pixelDynamicStatBox: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRightWidth: 1,
+    borderColor: '#4F493E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pixelDynamicStatValue: {
+    color: '#171613',
+    fontFamily: 'serif',
+    fontSize: 22,
+    lineHeight: 25,
+    fontWeight: '900',
+  },
+  pixelDynamicStatLabel: {
+    marginTop: 4,
+    color: '#29251F',
+    fontFamily: 'serif',
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '800',
+  },
+  pixelArticleGrid: {
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: '#4F493E',
+  },
+  pixelArticleCard: {
+    minHeight: 95,
     padding: 7,
-    borderWidth: 3,
+    borderBottomWidth: 1,
+    borderColor: '#4F493E',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pixelArticleTitle: {
+    marginTop: 6,
+    color: '#171613',
+    fontFamily: 'serif',
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: '900',
+  },
+  pixelArticleBody: {
+    marginTop: 5,
+    color: '#312D25',
+    fontFamily: 'serif',
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '700',
+  },
+  pixelSpecialRow: {
+    flexDirection: 'row',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#4F493E',
+  },
+  pixelSmallArticle: {
+    flex: 1,
+    minHeight: 74,
+    paddingHorizontal: 7,
+    paddingVertical: 7,
+    borderRightWidth: 1,
+    borderColor: '#4F493E',
+  },
+  pixelSmallArticleTitle: {
+    marginTop: 5,
+    color: '#171613',
+    fontFamily: 'serif',
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '900',
+  },
+  pixelFooterLine: {
+    minHeight: 24,
+    paddingTop: 5,
+    borderTopWidth: 2,
+    borderColor: '#2B2923',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 5,
+  },
+  pixelFooterTiny: {
+    color: '#352F27',
+    fontFamily: 'serif',
+    fontSize: 7,
+    lineHeight: 10,
+    fontWeight: '800',
+  },
+  pixelFooterQuote: {
+    flex: 1,
+    color: '#352F27',
+    fontFamily: 'serif',
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '800',
+    textAlign: 'center',
   },
   pixelPaper: {
     padding: 10,
