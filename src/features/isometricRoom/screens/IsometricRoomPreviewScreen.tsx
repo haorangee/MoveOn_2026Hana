@@ -5,6 +5,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -24,6 +25,7 @@ import type {
   MvpPetId,
 } from '@/features/customization/types/customization';
 import { IsometricRoomScene } from '../components/IsometricRoomScene';
+import { WaterPlantStatusModal } from '../components/WaterPlantStatusModal';
 import {
   isometricCharacterAnchor,
   isometricPetAnchor,
@@ -31,12 +33,26 @@ import {
   ROOM_DESIGN_WIDTH,
 } from '../constants/isometricRoomLayout';
 import { useIsometricRoomProfile } from '../hooks/useIsometricRoomProfile';
-import type { IsometricRoomObjectId } from '../types/isometricRoom';
+import { useIsometricCleaningState } from '../hooks/useIsometricCleaningState';
+import { useIsometricShowerState } from '../hooks/useIsometricShowerState';
+import { useIsometricStudyBooksState } from '../hooks/useIsometricStudyBooksState';
+import { useIsometricWaterPlantState } from '../hooks/useIsometricWaterPlantState';
+import type {
+  IsometricCleaningStage,
+  IsometricPlantStage,
+  IsometricRoomObjectId,
+  IsometricShowerStage,
+} from '../types/isometricRoom';
+import { createPreviewIsometricStudyBooks } from '../utils/layoutIsometricStudyBooks';
 
 type ViewportSize = {
   width: number;
   height: number;
 };
+
+type BookPreviewMode = 'actual' | '0' | '3' | '6' | '10' | 'full';
+type CleaningPreviewMode = 'actual' | IsometricCleaningStage;
+type ShowerPreviewMode = 'actual' | IsometricShowerStage;
 
 const routeByObject: Partial<Record<IsometricRoomObjectId, Href>> = {
   studyDesk: '/study-desk',
@@ -47,15 +63,35 @@ const routeByObject: Partial<Record<IsometricRoomObjectId, Href>> = {
   cleaningFloor: '/cleaning',
 };
 
+const previewStages: Array<IsometricPlantStage> = [0, 1, 2, 3, 4, 5];
+const cleaningPreviewStages: IsometricCleaningStage[] = [0, 1, 2, 3];
+const bookPreviewModes: Array<{ label: string; mode: BookPreviewMode }> = [
+  { label: '실제', mode: 'actual' },
+  { label: '0', mode: '0' },
+  { label: '3', mode: '3' },
+  { label: '6', mode: '6' },
+  { label: '10', mode: '10' },
+  { label: '가득', mode: 'full' },
+];
+
 export default function IsometricRoomPreviewScreen() {
   const router = useRouter();
   const profile = useIsometricRoomProfile();
+  const cleaningState = useIsometricCleaningState();
+  const showerState = useIsometricShowerState();
+  const waterPlantState = useIsometricWaterPlantState();
+  const studyBooksState = useIsometricStudyBooksState();
   const [viewport, setViewport] = useState<ViewportSize>({ width: 0, height: 0 });
   const [showDebugHotspots, setShowDebugHotspots] = useState(false);
   const [showAvatarPanel, setShowAvatarPanel] = useState(false);
+  const [showStatePanel, setShowStatePanel] = useState(false);
   const [previewCharacterId, setPreviewCharacterId] = useState<MvpCharacterId | null>(null);
   const [previewPetId, setPreviewPetId] = useState<MvpPetId | null>(null);
-  const [waterNoticeVisible, setWaterNoticeVisible] = useState(false);
+  const [previewPlantStage, setPreviewPlantStage] = useState<IsometricPlantStage | null>(null);
+  const [previewBookMode, setPreviewBookMode] = useState<BookPreviewMode>('actual');
+  const [previewCleaningMode, setPreviewCleaningMode] = useState<CleaningPreviewMode>('actual');
+  const [previewShowerMode, setPreviewShowerMode] = useState<ShowerPreviewMode>('actual');
+  const [waterStatusVisible, setWaterStatusVisible] = useState(false);
   const [routeNotice, setRouteNotice] = useState<string | null>(null);
 
   const sceneScale = useMemo(() => {
@@ -71,19 +107,43 @@ export default function IsometricRoomPreviewScreen() {
     height: ROOM_DESIGN_HEIGHT * sceneScale,
   }), [sceneScale]);
 
+  const currentCharacterId = previewCharacterId ?? profile.characterId;
+  const currentPetId = previewPetId ?? profile.petId;
+  const currentPlantStage = previewPlantStage ?? waterPlantState.stage;
+  const currentPlantCompleted = currentPlantStage >= 5 || (
+    previewPlantStage === null && waterPlantState.isCompleted
+  );
+  const currentCleaningStage = previewCleaningMode === 'actual'
+    ? cleaningState.stage
+    : previewCleaningMode;
+  const currentShowerStage = previewShowerMode === 'actual'
+    ? showerState.stage
+    : previewShowerMode;
+  const currentCharacter = MVP_CHARACTER_CATALOG.find((item) => item.id === currentCharacterId)
+    ?? MVP_CHARACTER_CATALOG[0];
+  const currentPet = MVP_PET_CATALOG.find((item) => item.id === currentPetId)
+    ?? MVP_PET_CATALOG[0];
+  const currentStudyBooks = useMemo(() => {
+    if (previewBookMode === 'actual') {
+      return studyBooksState.visibleBooks;
+    }
+
+    const count = previewBookMode === 'full'
+      ? studyBooksState.maxVisibleBooks
+      : Number(previewBookMode);
+    return createPreviewIsometricStudyBooks(count);
+  }, [
+    previewBookMode,
+    studyBooksState.maxVisibleBooks,
+    studyBooksState.visibleBooks,
+  ]);
+
   const handleSceneLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     setViewport((current) => (
       current.width === width && current.height === height ? current : { width, height }
     ));
   };
-
-  const currentCharacterId = previewCharacterId ?? profile.characterId;
-  const currentPetId = previewPetId ?? profile.petId;
-  const currentCharacter = MVP_CHARACTER_CATALOG.find((item) => item.id === currentCharacterId)
-    ?? MVP_CHARACTER_CATALOG[0];
-  const currentPet = MVP_PET_CATALOG.find((item) => item.id === currentPetId)
-    ?? MVP_PET_CATALOG[0];
 
   const moveCharacterPreview = (direction: 1 | -1) => {
     setPreviewCharacterId((current) => {
@@ -109,7 +169,8 @@ export default function IsometricRoomPreviewScreen() {
 
   const openRoute = (objectId: IsometricRoomObjectId, label: string) => {
     if (objectId === 'waterPlant') {
-      setWaterNoticeVisible(true);
+      void waterPlantState.reload();
+      setWaterStatusVisible(true);
       return;
     }
 
@@ -126,6 +187,27 @@ export default function IsometricRoomPreviewScreen() {
     }
   };
 
+  const selectBookPreviewMode = (mode: BookPreviewMode) => {
+    setPreviewBookMode(mode);
+    if (mode === 'actual') {
+      void studyBooksState.reload();
+    }
+  };
+
+  const selectCleaningPreviewMode = (mode: CleaningPreviewMode) => {
+    setPreviewCleaningMode(mode);
+    if (mode === 'actual') {
+      void cleaningState.reload();
+    }
+  };
+
+  const selectShowerPreviewMode = (mode: ShowerPreviewMode) => {
+    setPreviewShowerMode(mode);
+    if (mode === 'actual') {
+      void showerState.reload();
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
@@ -139,10 +221,10 @@ export default function IsometricRoomPreviewScreen() {
         </Pressable>
         <View style={styles.headerCopy}>
           <Text style={styles.title}>MoveOn Room Preview</Text>
-          <Text numberOfLines={1} style={styles.subtitle}>이미지 기반 원룸 배치 확인용</Text>
+          <Text numberOfLines={1} style={styles.subtitle}>이미지 기반 아이소메트릭 방 상태 확인</Text>
         </View>
         <Pressable
-          accessibilityLabel="터치 영역 디버그 표시 전환"
+          accessibilityLabel="배치 영역 디버그 표시 전환"
           accessibilityRole="switch"
           accessibilityState={{ checked: showDebugHotspots }}
           onPress={() => setShowDebugHotspots((current) => !current)}
@@ -172,6 +254,22 @@ export default function IsometricRoomPreviewScreen() {
             </Text>
           </Pressable>
         ) : null}
+        {__DEV__ ? (
+          <Pressable
+            accessibilityLabel="STATE 개발 패널 열기"
+            accessibilityRole="button"
+            onPress={() => setShowStatePanel((current) => !current)}
+            style={({ pressed }) => [
+              styles.debugToggle,
+              showStatePanel && styles.stateToggleActive,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={[styles.debugToggleText, showStatePanel && styles.stateToggleTextActive]}>
+              STATE
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <View onLayout={handleSceneLayout} style={styles.previewArea}>
@@ -196,9 +294,14 @@ export default function IsometricRoomPreviewScreen() {
           >
             <IsometricRoomScene
               characterIdOverride={previewCharacterId}
+              cleaningStage={currentCleaningStage}
               onObjectPress={openRoute}
               petIdOverride={previewPetId}
+              plantCompleted={currentPlantCompleted}
+              plantStage={currentPlantStage}
+              showerStage={currentShowerStage}
               showDebugHotspots={showDebugHotspots}
+              studyBooks={currentStudyBooks}
             />
           </View>
         </View>
@@ -261,6 +364,109 @@ export default function IsometricRoomPreviewScreen() {
         </View>
       ) : null}
 
+      {__DEV__ && showStatePanel ? (
+        <ScrollView
+          style={styles.statePanel}
+          contentContainerStyle={styles.statePanelContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.stateHeader}>
+            <Text style={styles.stateTitle}>화분 단계</Text>
+            <Text style={styles.stateMeta}>
+              실제 {waterPlantState.recordedCupCount}/{waterPlantState.goalCupCount}컵 · {waterPlantState.recordedAmountMl.toLocaleString()}ml
+            </Text>
+          </View>
+          <View style={styles.stageRow}>
+            <PreviewButton
+              label="실제"
+              onPress={() => setPreviewPlantStage(null)}
+              selected={previewPlantStage === null}
+            />
+            {previewStages.map((stage) => (
+              <PreviewButton
+                key={stage}
+                label={String(stage)}
+                onPress={() => setPreviewPlantStage(stage)}
+                selected={previewPlantStage === stage}
+              />
+            ))}
+          </View>
+
+          <View style={styles.stateDivider} />
+
+          <View style={styles.stateHeader}>
+            <Text style={styles.stateTitle}>책장</Text>
+            <Text style={styles.stateMeta}>
+              표시 {currentStudyBooks.length}권 / 실제 {studyBooksState.totalBookCount}권
+            </Text>
+          </View>
+          <View style={styles.stageRow}>
+            {bookPreviewModes.map((item) => (
+              <PreviewButton
+                key={item.mode}
+                label={item.label}
+                onPress={() => selectBookPreviewMode(item.mode)}
+                selected={previewBookMode === item.mode}
+              />
+            ))}
+          </View>
+
+          <View style={styles.stateDivider} />
+
+          <View style={styles.stateHeader}>
+            <Text style={styles.stateTitle}>청소</Text>
+            <Text style={styles.stateMeta}>
+              실제 {cleaningState.todayCleaningCount} / 3회 · stage {cleaningState.stage}
+            </Text>
+          </View>
+          <View style={styles.stageRow}>
+            <PreviewButton
+              label="실제"
+              onPress={() => selectCleaningPreviewMode('actual')}
+              selected={previewCleaningMode === 'actual'}
+            />
+            {cleaningPreviewStages.map((stage) => (
+              <PreviewButton
+                key={stage}
+                label={String(stage)}
+                onPress={() => selectCleaningPreviewMode(stage)}
+                selected={previewCleaningMode === stage}
+              />
+            ))}
+          </View>
+
+          <View style={styles.stateDivider} />
+
+          <View style={styles.stateHeader}>
+            <Text style={styles.stateTitle}>샤워</Text>
+            <Text style={styles.stateMeta}>
+              실제 {showerState.isCompleted ? '완료' : '미완료'}
+              {showerState.todayShowerCount > 0 ? ` · ${showerState.todayShowerCount}회` : ''}
+            </Text>
+          </View>
+          <View style={styles.stageRow}>
+            <PreviewButton
+              label="실제"
+              onPress={() => selectShowerPreviewMode('actual')}
+              selected={previewShowerMode === 'actual'}
+            />
+            <PreviewButton
+              label="미완료"
+              onPress={() => selectShowerPreviewMode(0)}
+              selected={previewShowerMode === 0}
+            />
+            <PreviewButton
+              label="완료"
+              onPress={() => selectShowerPreviewMode(1)}
+              selected={previewShowerMode === 1}
+            />
+          </View>
+          <Text style={styles.stateHelp}>
+            개발 전환은 화면 state만 바꾸며 물 기록·공부 기록·청소 기록·샤워 기록·AsyncStorage·Firestore에는 저장하지 않아요.
+          </Text>
+        </ScrollView>
+      ) : null}
+
       <View style={styles.footer}>
         <Text style={styles.footerText}>방 안의 물건을 눌러 기능 연결을 확인해 보세요.</Text>
         {__DEV__ ? (
@@ -270,29 +476,17 @@ export default function IsometricRoomPreviewScreen() {
         ) : null}
       </View>
 
-      <Modal
-        animationType="fade"
-        onRequestClose={() => setWaterNoticeVisible(false)}
-        transparent
-        visible={waterNoticeVisible}
-      >
-        <Pressable style={styles.modalBackdrop} onPress={() => setWaterNoticeVisible(false)}>
-          <Pressable style={styles.modalCard} onPress={() => null}>
-            <Text style={styles.modalTitle}>물 마시기 연결 예정</Text>
-            <Text style={styles.modalDescription}>
-              기존 물 마시기 기능은 현재 홈의 WaterMissionLayer 내부 흐름에 연결되어 있어요.
-              이번 프리뷰에서는 위치와 터치감만 확인하고, 다음 단계에서 기존 물 미션 상태와 안전하게 연결합니다.
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setWaterNoticeVisible(false)}
-              style={({ pressed }) => [styles.modalButton, pressed && styles.pressed]}
-            >
-              <Text style={styles.modalButtonText}>확인</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <WaterPlantStatusModal
+        error={waterPlantState.error}
+        goalAmountMl={waterPlantState.goalAmountMl}
+        goalCupCount={waterPlantState.goalCupCount}
+        isCompleted={waterPlantState.isCompleted}
+        onClose={() => setWaterStatusVisible(false)}
+        recordedAmountMl={waterPlantState.recordedAmountMl}
+        recordedCupCount={waterPlantState.recordedCupCount}
+        stage={waterPlantState.stage}
+        visible={waterStatusVisible}
+      />
 
       <Modal
         animationType="fade"
@@ -318,6 +512,31 @@ export default function IsometricRoomPreviewScreen() {
   );
 }
 
+type PreviewButtonProps = {
+  label: string;
+  onPress: () => void;
+  selected: boolean;
+};
+
+function PreviewButton({ label, onPress, selected }: PreviewButtonProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.stageButton,
+        selected && styles.stageButtonActive,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Text style={[styles.stageButtonText, selected && styles.stageButtonTextActive]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -329,7 +548,7 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   backButton: {
     width: 44,
@@ -361,7 +580,7 @@ const styles = StyleSheet.create({
   debugToggle: {
     minWidth: 48,
     height: 36,
-    paddingHorizontal: 12,
+    paddingHorizontal: 11,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
@@ -377,6 +596,10 @@ const styles = StyleSheet.create({
     borderColor: '#A586BE',
     backgroundColor: '#F1E5FF',
   },
+  stateToggleActive: {
+    borderColor: '#86A56D',
+    backgroundColor: '#EAF4DD',
+  },
   debugToggleText: {
     color: '#827266',
     fontSize: 11,
@@ -387,6 +610,9 @@ const styles = StyleSheet.create({
   },
   avatarToggleTextActive: {
     color: '#704D8E',
+  },
+  stateToggleTextActive: {
+    color: '#577340',
   },
   previewArea: {
     height: '46%',
@@ -487,6 +713,72 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     textAlign: 'right',
+  },
+  statePanel: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    maxHeight: 230,
+  },
+  statePanelContent: {
+    padding: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#DCE8CF',
+    backgroundColor: 'rgba(250, 255, 244, 0.96)',
+    gap: 9,
+  },
+  stateHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  stateTitle: {
+    color: '#475D38',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  stateMeta: {
+    flex: 1,
+    color: '#7B8F66',
+    fontSize: 10,
+    fontWeight: '800',
+    textAlign: 'right',
+  },
+  stateDivider: {
+    height: 1,
+    backgroundColor: '#DEE8D4',
+  },
+  stageRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+  },
+  stageButton: {
+    minWidth: 42,
+    minHeight: 32,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EEF3E7',
+  },
+  stageButtonActive: {
+    backgroundColor: '#7D8D62',
+  },
+  stageButtonText: {
+    color: '#637452',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  stageButtonTextActive: {
+    color: '#FFF9EF',
+  },
+  stateHelp: {
+    color: '#8B9A78',
+    fontSize: 10,
+    fontWeight: '700',
+    lineHeight: 15,
   },
   pressed: {
     opacity: 0.82,
