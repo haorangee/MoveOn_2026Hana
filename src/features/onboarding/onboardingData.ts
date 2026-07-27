@@ -1,17 +1,22 @@
 import type { ImageSource } from 'expo-image';
+import type {
+  MvpPetSpecies,
+} from '@/features/customization/types/customization';
 
-export type CharacterId = 'daily' | 'cozy' | 'casual' | 'neat' | 'ropan';
-export type PetSpecies = 'dog' | 'cat' | 'rabbit' | 'hamster';
+export type LegacyCharacterId = 'daily' | 'cozy' | 'casual' | 'neat' | 'ropan';
+export type CharacterId = LegacyCharacterId;
+export type LegacyPetSpecies = 'dog' | 'cat' | 'rabbit' | 'hamster';
+export type PetSpecies = LegacyPetSpecies | MvpPetSpecies;
 
 export type CharacterOption = {
-  id: CharacterId;
+  id: LegacyCharacterId;
   name: string;
   description: string;
   image: ImageSource;
 };
 
 export type PetOption = {
-  id: PetSpecies;
+  id: LegacyPetSpecies;
   name: string;
   description: string;
   image: ImageSource;
@@ -77,10 +82,10 @@ export const petOptions: PetOption[] = [
   },
 ];
 
-export function getCharacterOption(id: CharacterId) {
+export function getCharacterOption(id: string | null | undefined) {
   return characterOptions.find((option) => option.id === id) ?? characterOptions[0];
 }
 
-export function getPetOption(id: PetSpecies) {
+export function getPetOption(id: string | null | undefined) {
   return petOptions.find((option) => option.id === id) ?? petOptions[0];
 }

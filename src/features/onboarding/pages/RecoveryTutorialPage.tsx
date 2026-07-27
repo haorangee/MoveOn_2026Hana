@@ -36,7 +36,7 @@ const actions: Array<{
 ];
 
 type RecoveryTutorialPageProps = {
-  characterId: CharacterId;
+  characterId: string;
   petSpecies: PetSpecies;
   onContinue: () => void;
 };

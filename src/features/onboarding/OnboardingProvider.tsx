@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 import type { UserProfile } from '@/contracts/user-profile';
+import type { MvpPetId } from '@/features/customization/types/customization';
 import { useAuth } from '@/features/auth/AuthProvider';
 import {
   recordFirebaseLogin,
@@ -15,7 +16,7 @@ import {
 } from '@/features/auth/firebaseLoginRecords';
 import { birthDateFromAge, resolveBirthDate } from '@/features/onboarding/birthDate';
 import type { ChapterId } from '@/features/onboarding/domain/onboardingState';
-import type { CharacterId, PetSpecies } from '@/features/onboarding/onboardingData';
+import type { PetSpecies } from '@/features/onboarding/onboardingData';
 import { onboardingRepository } from '@/features/onboarding/data/onboardingRepository';
 import {
   deleteUserProfile,
@@ -36,8 +37,9 @@ export type MoveOnProfile = {
   age: number;
   birthDate: string;
   petSpecies: PetSpecies;
+  petId?: MvpPetId | string | null;
   petName: string;
-  characterId: CharacterId;
+  characterId: string;
   chapter: ChapterId;
   magazineNotificationEnabled: boolean;
   totalXp: number;
@@ -52,6 +54,7 @@ const initialProfile: MoveOnProfile = {
   age: 20,
   birthDate: birthDateFromAge(20),
   petSpecies: 'dog',
+  petId: null,
   petName: '',
   characterId: 'daily',
   chapter: 'general',
@@ -87,10 +90,13 @@ function normalizeProfile(value: unknown): MoveOnProfile | null {
     age: profile.age,
     birthDate: resolveBirthDate(profile.birthDate, profile.age),
     petSpecies: profile.petSpecies as PetSpecies,
+    petId: typeof profile.petId === 'string' && profile.petId.trim()
+      ? profile.petId.trim()
+      : null,
     petName: typeof profile.petName === 'string' && profile.petName.trim()
       ? profile.petName.trim()
       : LEGACY_PET_NAME,
-    characterId: profile.characterId as CharacterId,
+    characterId: profile.characterId,
     chapter: profile.chapter === 'college'
       || profile.chapter === 'job-seeker'
       || profile.chapter === 'worker'
@@ -145,6 +151,7 @@ function toUserProfile(profile: MoveOnProfile): UserProfile {
     age: profile.age,
     birthDate: profile.birthDate,
     petSpecies: profile.petSpecies,
+    petId: profile.petId ?? null,
     petName: profile.petName,
     characterId: profile.characterId,
     chapter: profile.chapter,
@@ -163,6 +170,7 @@ function toMoveOnProfile(profile: UserProfile): MoveOnProfile {
     age: profile.age,
     birthDate: profile.birthDate,
     petSpecies: profile.petSpecies,
+    petId: profile.petId ?? null,
     petName: profile.petName,
     characterId: profile.characterId,
     chapter: profile.chapter,

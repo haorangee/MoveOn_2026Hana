@@ -4,7 +4,7 @@ import { TutorialRoomScene } from '@/features/onboarding/components/TutorialRoom
 import type { CharacterId, PetSpecies } from '@/features/onboarding/onboardingData';
 
 type WelcomePageProps = {
-  characterId: CharacterId;
+  characterId: string;
   petSpecies: PetSpecies;
   onStart: () => void;
 };

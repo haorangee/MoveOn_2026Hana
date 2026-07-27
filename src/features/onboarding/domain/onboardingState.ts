@@ -1,3 +1,12 @@
+import {
+  isMvpCharacterId,
+} from '@/features/customization/catalogs/characterCatalog';
+import {
+  getDefaultMvpPetIdBySpecies,
+  isMvpPetId,
+  isMvpPetSpecies,
+} from '@/features/customization/catalogs/petCatalog';
+import type { MvpPetId } from '@/features/customization/types/customization';
 import type { CharacterId, PetSpecies } from '@/features/onboarding/onboardingData';
 
 export const ONBOARDING_STAGE_COUNT = 6;
@@ -12,8 +21,9 @@ export type OnboardingState = {
   nickname: string;
   birthDate: string;
   selectedPetSpecies: PetSpecies;
+  selectedPetId: MvpPetId | null;
   petName: string;
-  selectedCharacterId: CharacterId;
+  selectedCharacterId: string;
   selectedChapter: ChapterId;
   magazineNotificationEnabled: boolean | null;
   tutorialCompleted: boolean;
@@ -38,6 +48,7 @@ export const defaultOnboardingState: OnboardingState = {
   nickname: '',
   birthDate: '',
   selectedPetSpecies: 'dog',
+  selectedPetId: 'dog-bichon',
   petName: '',
   selectedCharacterId: 'daily',
   selectedChapter: 'general',
@@ -47,7 +58,7 @@ export const defaultOnboardingState: OnboardingState = {
 };
 
 const characterIds: CharacterId[] = ['daily', 'cozy', 'casual', 'neat', 'ropan'];
-const petSpecies: PetSpecies[] = ['dog', 'cat', 'rabbit', 'hamster'];
+const petSpecies: PetSpecies[] = ['dog', 'cat', 'rabbit', 'hamster', 'squirrel'];
 const chapterIds: ChapterId[] = ['college', 'job-seeker', 'worker', 'general'];
 
 export function normalizeOnboardingState(value: unknown): OnboardingState {
@@ -61,6 +72,22 @@ export function normalizeOnboardingState(value: unknown): OnboardingState {
     ? Math.min(6, Math.max(0, Math.floor(state.profileSetupStep)))
     : 0;
 
+  const selectedPetSpecies = petSpecies.includes(state.selectedPetSpecies as PetSpecies)
+    ? state.selectedPetSpecies as PetSpecies
+    : 'dog';
+  const selectedPetId = isMvpPetId(state.selectedPetId)
+    ? state.selectedPetId
+    : isMvpPetSpecies(selectedPetSpecies)
+      ? getDefaultMvpPetIdBySpecies(selectedPetSpecies)
+      : null;
+  const incomingCharacterId = typeof state.selectedCharacterId === 'string'
+    ? state.selectedCharacterId
+    : '';
+  const selectedCharacterId = characterIds.includes(incomingCharacterId as CharacterId)
+    || isMvpCharacterId(incomingCharacterId)
+    ? incomingCharacterId
+    : 'daily';
+
   return {
     ...defaultOnboardingState,
     currentStep,
@@ -68,15 +95,12 @@ export function normalizeOnboardingState(value: unknown): OnboardingState {
     phase: state.phase === 'first-action' || state.phase === 'complete' ? state.phase : 'guide',
     nickname: typeof state.nickname === 'string' ? state.nickname.slice(0, 10) : '',
     birthDate: typeof state.birthDate === 'string' ? state.birthDate : '',
-    selectedPetSpecies: petSpecies.includes(state.selectedPetSpecies as PetSpecies)
-      ? state.selectedPetSpecies as PetSpecies
-      : 'dog',
+    selectedPetSpecies,
+    selectedPetId,
     petName: typeof state.petName === 'string' && state.petName.trim()
       ? state.petName.slice(0, 10)
       : '',
-    selectedCharacterId: characterIds.includes(state.selectedCharacterId as CharacterId)
-      ? state.selectedCharacterId as CharacterId
-      : 'daily',
+    selectedCharacterId,
     selectedChapter: chapterIds.includes(state.selectedChapter as ChapterId)
       ? state.selectedChapter as ChapterId
       : 'general',

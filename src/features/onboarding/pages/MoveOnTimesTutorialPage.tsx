@@ -7,7 +7,7 @@ import {
 import type { CharacterId, PetSpecies } from '@/features/onboarding/onboardingData';
 
 type MoveOnTimesTutorialPageProps = {
-  characterId: CharacterId;
+  characterId: string;
   nickname: string;
   petSpecies: PetSpecies;
   onContinue: () => void;

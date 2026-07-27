@@ -10,7 +10,7 @@ import {
 import type { CharacterId } from '@/features/onboarding/onboardingData';
 
 type StudySceneProps = {
-  characterId?: CharacterId;
+  characterId?: string;
   isStarted: boolean;
   isRunning: boolean;
   isPaused: boolean;
@@ -105,6 +105,9 @@ export function StudyScene({
   completedPages,
   currentPageProgress,
 }: StudySceneProps) {
+  const sceneCharacterId: CharacterId = characterId in studySceneSources
+    ? characterId as CharacterId
+    : 'daily';
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const sceneFocus = useRef(new Animated.Value(isStarted ? 1 : 0)).current;
   const breathingMotion = useRef(new Animated.Value(0)).current;
@@ -260,7 +263,7 @@ export function StudyScene({
       >
         <Animated.Image
           resizeMode="cover"
-          source={studySceneSources[characterId]}
+          source={studySceneSources[sceneCharacterId]}
           style={styles.image}
         />
 
