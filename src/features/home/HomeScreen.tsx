@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { type Href, useRouter } from 'expo-router';
+import { ISOMETRIC_HOME_ROOM_ENABLED } from '@/features/home/constants/homeFeatureFlags';
+import { IsometricHomeRoom } from '@/features/home/components/IsometricHomeRoom';
 import { RoomScene } from '@/features/home/components/RoomScene';
 import type { RoomHotspot } from '@/features/home/roomData';
 
@@ -42,13 +44,17 @@ export function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <RoomScene
-        focusedObject={focusedObject}
-        onCleaningVerificationPress={handleCleaningVerificationPress}
-        onObjectPress={handleObjectPress}
-        onSettingsPress={handleSettingsPress}
-        systemMessage={systemMessage}
-      />
+      {ISOMETRIC_HOME_ROOM_ENABLED ? (
+        <IsometricHomeRoom />
+      ) : (
+        <RoomScene
+          focusedObject={focusedObject}
+          onCleaningVerificationPress={handleCleaningVerificationPress}
+          onObjectPress={handleObjectPress}
+          onSettingsPress={handleSettingsPress}
+          systemMessage={systemMessage}
+        />
+      )}
     </View>
   );
 }
