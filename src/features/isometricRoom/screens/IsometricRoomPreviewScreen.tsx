@@ -32,16 +32,20 @@ import {
   ROOM_DESIGN_WIDTH,
 } from '../constants/isometricRoomLayout';
 import { useIsometricRoomProfile } from '../hooks/useIsometricRoomProfile';
+import { useIsometricStudyBooksState } from '../hooks/useIsometricStudyBooksState';
 import { useIsometricWaterPlantState } from '../hooks/useIsometricWaterPlantState';
 import type {
   IsometricPlantStage,
   IsometricRoomObjectId,
 } from '../types/isometricRoom';
+import { createPreviewIsometricStudyBooks } from '../utils/layoutIsometricStudyBooks';
 
 type ViewportSize = {
   width: number;
   height: number;
 };
+
+type BookPreviewMode = 'actual' | '0' | '3' | '6' | '10' | 'full';
 
 const routeByObject: Partial<Record<IsometricRoomObjectId, Href>> = {
   studyDesk: '/study-desk',
@@ -53,11 +57,20 @@ const routeByObject: Partial<Record<IsometricRoomObjectId, Href>> = {
 };
 
 const previewStages: Array<IsometricPlantStage> = [0, 1, 2, 3, 4, 5];
+const bookPreviewModes: Array<{ label: string; mode: BookPreviewMode }> = [
+  { label: '실제', mode: 'actual' },
+  { label: '0', mode: '0' },
+  { label: '3', mode: '3' },
+  { label: '6', mode: '6' },
+  { label: '10', mode: '10' },
+  { label: '가득', mode: 'full' },
+];
 
 export default function IsometricRoomPreviewScreen() {
   const router = useRouter();
   const profile = useIsometricRoomProfile();
   const waterPlantState = useIsometricWaterPlantState();
+  const studyBooksState = useIsometricStudyBooksState();
   const [viewport, setViewport] = useState<ViewportSize>({ width: 0, height: 0 });
   const [showDebugHotspots, setShowDebugHotspots] = useState(false);
   const [showAvatarPanel, setShowAvatarPanel] = useState(false);
@@ -65,6 +78,7 @@ export default function IsometricRoomPreviewScreen() {
   const [previewCharacterId, setPreviewCharacterId] = useState<MvpCharacterId | null>(null);
   const [previewPetId, setPreviewPetId] = useState<MvpPetId | null>(null);
   const [previewPlantStage, setPreviewPlantStage] = useState<IsometricPlantStage | null>(null);
+  const [previewBookMode, setPreviewBookMode] = useState<BookPreviewMode>('actual');
   const [waterStatusVisible, setWaterStatusVisible] = useState(false);
   const [routeNotice, setRouteNotice] = useState<string | null>(null);
 
@@ -91,6 +105,20 @@ export default function IsometricRoomPreviewScreen() {
     ?? MVP_CHARACTER_CATALOG[0];
   const currentPet = MVP_PET_CATALOG.find((item) => item.id === currentPetId)
     ?? MVP_PET_CATALOG[0];
+  const currentStudyBooks = useMemo(() => {
+    if (previewBookMode === 'actual') {
+      return studyBooksState.visibleBooks;
+    }
+
+    const count = previewBookMode === 'full'
+      ? studyBooksState.maxVisibleBooks
+      : Number(previewBookMode);
+    return createPreviewIsometricStudyBooks(count);
+  }, [
+    previewBookMode,
+    studyBooksState.maxVisibleBooks,
+    studyBooksState.visibleBooks,
+  ]);
 
   const handleSceneLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -141,6 +169,13 @@ export default function IsometricRoomPreviewScreen() {
     }
   };
 
+  const selectBookPreviewMode = (mode: BookPreviewMode) => {
+    setPreviewBookMode(mode);
+    if (mode === 'actual') {
+      void studyBooksState.reload();
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
@@ -154,10 +189,10 @@ export default function IsometricRoomPreviewScreen() {
         </Pressable>
         <View style={styles.headerCopy}>
           <Text style={styles.title}>MoveOn Room Preview</Text>
-          <Text numberOfLines={1} style={styles.subtitle}>이미지 기반 원룸 배치 확인</Text>
+          <Text numberOfLines={1} style={styles.subtitle}>이미지 기반 아이소메트릭 방 상태 확인</Text>
         </View>
         <Pressable
-          accessibilityLabel="터치 영역 디버그 표시 전환"
+          accessibilityLabel="배치 영역 디버그 표시 전환"
           accessibilityRole="switch"
           accessibilityState={{ checked: showDebugHotspots }}
           onPress={() => setShowDebugHotspots((current) => !current)}
@@ -232,6 +267,7 @@ export default function IsometricRoomPreviewScreen() {
               plantCompleted={currentPlantCompleted}
               plantStage={currentPlantStage}
               showDebugHotspots={showDebugHotspots}
+              studyBooks={currentStudyBooks}
             />
           </View>
         </View>
@@ -303,13 +339,13 @@ export default function IsometricRoomPreviewScreen() {
             </Text>
           </View>
           <View style={styles.stageRow}>
-            <StageButton
+            <PreviewButton
               label="실제"
               onPress={() => setPreviewPlantStage(null)}
               selected={previewPlantStage === null}
             />
             {previewStages.map((stage) => (
-              <StageButton
+              <PreviewButton
                 key={stage}
                 label={String(stage)}
                 onPress={() => setPreviewPlantStage(stage)}
@@ -317,8 +353,27 @@ export default function IsometricRoomPreviewScreen() {
               />
             ))}
           </View>
+
+          <View style={styles.stateDivider} />
+
+          <View style={styles.stateHeader}>
+            <Text style={styles.stateTitle}>책장</Text>
+            <Text style={styles.stateMeta}>
+              표시 {currentStudyBooks.length}권 / 실제 {studyBooksState.totalBookCount}권
+            </Text>
+          </View>
+          <View style={styles.stageRow}>
+            {bookPreviewModes.map((item) => (
+              <PreviewButton
+                key={item.mode}
+                label={item.label}
+                onPress={() => selectBookPreviewMode(item.mode)}
+                selected={previewBookMode === item.mode}
+              />
+            ))}
+          </View>
           <Text style={styles.stateHelp}>
-            개발 전환은 화면 state만 바꾸며 물 기록·AsyncStorage·Firestore에는 저장하지 않아요.
+            개발 전환은 화면 state만 바꾸며 물 기록·공부 기록·AsyncStorage·Firestore에는 저장하지 않아요.
           </Text>
         </View>
       ) : null}
@@ -368,13 +423,13 @@ export default function IsometricRoomPreviewScreen() {
   );
 }
 
-type StageButtonProps = {
+type PreviewButtonProps = {
   label: string;
   onPress: () => void;
   selected: boolean;
 };
 
-function StageButton({ label, onPress, selected }: StageButtonProps) {
+function PreviewButton({ label, onPress, selected }: PreviewButtonProps) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -597,6 +652,10 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     textAlign: 'right',
+  },
+  stateDivider: {
+    height: 1,
+    backgroundColor: '#DEE8D4',
   },
   stageRow: {
     flexDirection: 'row',
