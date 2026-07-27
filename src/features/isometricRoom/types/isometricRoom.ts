@@ -13,6 +13,7 @@ export type IsometricRoomObjectId =
   | 'pet';
 
 export type VacuumCleanerState = 'idle' | 'active';
+export type IsometricPlantStage = 0 | 1 | 2 | 3 | 4 | 5;
 
 export interface IsometricRoomRect {
   x: number;

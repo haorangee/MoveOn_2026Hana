@@ -8,10 +8,12 @@ import {
 import { IsometricCharacterLayer } from './IsometricCharacterLayer';
 import { IsometricPetLayer } from './IsometricPetLayer';
 import { IsometricRoomArtwork } from './IsometricRoomArtwork';
+import { IsometricWaterPlantLayer } from './IsometricWaterPlantLayer';
 import { RoomHotspot } from './RoomHotspot';
 import { VacuumCleanerLayer } from './VacuumCleanerLayer';
 import { useIsometricRoomProfile } from '../hooks/useIsometricRoomProfile';
 import type {
+  IsometricPlantStage,
   IsometricRoomObjectId,
   VacuumCleanerState,
 } from '../types/isometricRoom';
@@ -20,6 +22,8 @@ const CLEANING_START_DELAY_MS = 400;
 
 type IsometricRoomSceneProps = {
   characterIdOverride?: string | null;
+  plantStage?: IsometricPlantStage;
+  plantCompleted?: boolean;
   petIdOverride?: string | null;
   showDebugHotspots?: boolean;
   onObjectPress: (objectId: IsometricRoomObjectId, label: string) => void;
@@ -28,6 +32,8 @@ type IsometricRoomSceneProps = {
 export function IsometricRoomScene({
   characterIdOverride,
   onObjectPress,
+  plantCompleted = false,
+  plantStage = 0,
   petIdOverride,
   showDebugHotspots = false,
 }: IsometricRoomSceneProps) {
@@ -71,6 +77,10 @@ export function IsometricRoomScene({
       <View pointerEvents="none" style={styles.floatShadow} />
       <View style={styles.roomShell}>
         <IsometricRoomArtwork />
+        <IsometricWaterPlantLayer
+          isCompleted={plantCompleted}
+          stage={plantStage}
+        />
         <VacuumCleanerLayer state={vacuumState} />
         <IsometricCharacterLayer characterId={characterId} />
         <IsometricPetLayer

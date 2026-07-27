@@ -104,6 +104,14 @@ export const isometricPetLayout = createBottomCenterLayout(
   81,
 ) satisfies VacuumCleanerLayout;
 
+export const isometricWaterPlantLayout = {
+  x: 50,
+  y: 230,
+  width: 92,
+  height: 118,
+  zIndex: 62,
+} satisfies VacuumCleanerLayout;
+
 export const isometricRoomObjects: IsometricRoomObjectLayout[] = [
   {
     id: 'bed',
