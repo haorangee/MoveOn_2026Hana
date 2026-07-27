@@ -6,13 +6,21 @@ import {
   ROOM_DESIGN_WIDTH,
 } from '../constants/isometricRoomLayout';
 import { IsometricCharacterLayer } from './IsometricCharacterLayer';
+import { IsometricCleaningMessLayer } from './IsometricCleaningMessLayer';
+import { IsometricFreshnessEffectLayer } from './IsometricFreshnessEffectLayer';
 import { IsometricPetLayer } from './IsometricPetLayer';
 import { IsometricRoomArtwork } from './IsometricRoomArtwork';
+import { IsometricStudyBooksLayer } from './IsometricStudyBooksLayer';
+import { IsometricWaterPlantLayer } from './IsometricWaterPlantLayer';
 import { RoomHotspot } from './RoomHotspot';
 import { VacuumCleanerLayer } from './VacuumCleanerLayer';
 import { useIsometricRoomProfile } from '../hooks/useIsometricRoomProfile';
 import type {
+  IsometricCleaningStage,
+  IsometricPlantStage,
   IsometricRoomObjectId,
+  IsometricShowerStage,
+  IsometricStudyBookVisual,
   VacuumCleanerState,
 } from '../types/isometricRoom';
 
@@ -20,16 +28,26 @@ const CLEANING_START_DELAY_MS = 400;
 
 type IsometricRoomSceneProps = {
   characterIdOverride?: string | null;
+  cleaningStage?: IsometricCleaningStage;
+  plantStage?: IsometricPlantStage;
+  plantCompleted?: boolean;
   petIdOverride?: string | null;
+  showerStage?: IsometricShowerStage;
   showDebugHotspots?: boolean;
+  studyBooks?: IsometricStudyBookVisual[];
   onObjectPress: (objectId: IsometricRoomObjectId, label: string) => void;
 };
 
 export function IsometricRoomScene({
   characterIdOverride,
+  cleaningStage = 0,
   onObjectPress,
+  plantCompleted = false,
+  plantStage = 0,
   petIdOverride,
+  showerStage = 0,
   showDebugHotspots = false,
+  studyBooks = [],
 }: IsometricRoomSceneProps) {
   const profile = useIsometricRoomProfile();
   const characterId = characterIdOverride ?? profile.characterId;
@@ -71,8 +89,15 @@ export function IsometricRoomScene({
       <View pointerEvents="none" style={styles.floatShadow} />
       <View style={styles.roomShell}>
         <IsometricRoomArtwork />
+        <IsometricWaterPlantLayer
+          isCompleted={plantCompleted}
+          stage={plantStage}
+        />
+        <IsometricStudyBooksLayer books={studyBooks} />
+        <IsometricCleaningMessLayer stage={cleaningStage} />
         <VacuumCleanerLayer state={vacuumState} />
         <IsometricCharacterLayer characterId={characterId} />
+        <IsometricFreshnessEffectLayer stage={showerStage} />
         <IsometricPetLayer
           petId={petId}
           petSpecies={profile.petSpecies}

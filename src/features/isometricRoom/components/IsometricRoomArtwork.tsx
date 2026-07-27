@@ -4,7 +4,7 @@ import {
   ROOM_DESIGN_WIDTH,
 } from '../constants/isometricRoomLayout';
 
-const ROOM_ARTWORK = require('../../../../assets/images/isometric-room/moveon-room-v1.png') as ImageSourcePropType;
+const ROOM_ARTWORK = require('../../../../assets/images/isometric-room/moveon-room-empty-bookshelf-v2.png') as ImageSourcePropType;
 
 export function IsometricRoomArtwork() {
   return (

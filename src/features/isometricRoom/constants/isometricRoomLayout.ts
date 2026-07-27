@@ -1,5 +1,7 @@
 import type {
   IsometricRoomObjectLayout,
+  IsometricRoomRect,
+  IsometricStudyShelfRowId,
   VacuumCleanerState,
 } from '../types/isometricRoom';
 
@@ -7,11 +9,16 @@ export const ROOM_DESIGN_WIDTH = 768;
 export const ROOM_DESIGN_HEIGHT = 512;
 
 // Hotspot positions use the 768 x 512 app coordinate system for
-// assets/images/isometric-room/moveon-room-v1.png.
-type VacuumCleanerLayout = Pick<
+// assets/images/isometric-room/moveon-room-empty-bookshelf-v2.png.
+type LayerLayout = Pick<
   IsometricRoomObjectLayout,
   'height' | 'rotation' | 'width' | 'x' | 'y' | 'zIndex'
 >;
+
+export type IsometricStudyShelfRowLayout = IsometricRoomRect & {
+  id: IsometricStudyShelfRowId;
+  maxBooks: number;
+};
 
 function createBottomCenterLayout(
   anchorX: number,
@@ -51,7 +58,7 @@ export const vacuumCleanerIdleLayout = {
   height: 190,
   zIndex: 18,
   rotation: '0deg',
-} satisfies VacuumCleanerLayout;
+} satisfies LayerLayout;
 
 export const vacuumCleanerActiveLayout = {
   x: 454,
@@ -60,12 +67,12 @@ export const vacuumCleanerActiveLayout = {
   height: 225,
   zIndex: 71,
   rotation: '0deg',
-} satisfies VacuumCleanerLayout;
+} satisfies LayerLayout;
 
 export const vacuumCleanerLayouts = {
   idle: vacuumCleanerIdleLayout,
   active: vacuumCleanerActiveLayout,
-} satisfies Record<VacuumCleanerState, VacuumCleanerLayout>;
+} satisfies Record<VacuumCleanerState, LayerLayout>;
 
 const VACUUM_CLEANER_HOTSPOT_PADDING = 8;
 
@@ -76,7 +83,7 @@ export const vacuumCleanerIdleHotspotLayout = {
   height: 156,
   zIndex: vacuumCleanerIdleLayout.zIndex + 1,
   rotation: vacuumCleanerIdleLayout.rotation,
-} satisfies VacuumCleanerLayout;
+} satisfies LayerLayout;
 
 export const isometricCharacterAnchor = {
   x: 395,
@@ -94,7 +101,15 @@ export const isometricCharacterLayout = createBottomCenterLayout(
   115,
   155,
   80,
-) satisfies VacuumCleanerLayout;
+) satisfies LayerLayout;
+
+export const isometricFreshnessEffectLayout = {
+  x: isometricCharacterLayout.x - 8,
+  y: isometricCharacterLayout.y - 9,
+  width: isometricCharacterLayout.width + 16,
+  height: isometricCharacterLayout.height + 14,
+  zIndex: isometricCharacterLayout.zIndex + 2,
+} satisfies IsometricRoomRect & { zIndex: number };
 
 export const isometricPetLayout = createBottomCenterLayout(
   isometricPetAnchor.x,
@@ -102,7 +117,42 @@ export const isometricPetLayout = createBottomCenterLayout(
   62,
   62,
   81,
-) satisfies VacuumCleanerLayout;
+) satisfies LayerLayout;
+
+export const isometricWaterPlantLayout = {
+  x: 50,
+  y: 230,
+  width: 92,
+  height: 118,
+  zIndex: 62,
+} satisfies LayerLayout;
+
+export const isometricStudyBookshelfLayout = {
+  x: 510,
+  y: 148,
+  width: 94,
+  height: 126,
+  zIndex: 60,
+} satisfies IsometricRoomRect & { zIndex: number };
+
+export const isometricStudyShelfRows: IsometricStudyShelfRowLayout[] = [
+  {
+    id: 'bottom',
+    x: 526,
+    y: 212,
+    width: 60,
+    height: 29,
+    maxBooks: 6,
+  },
+  {
+    id: 'top',
+    x: 526,
+    y: 178,
+    width: 60,
+    height: 27,
+    maxBooks: 6,
+  },
+];
 
 export const isometricRoomObjects: IsometricRoomObjectLayout[] = [
   {
@@ -125,7 +175,7 @@ export const isometricRoomObjects: IsometricRoomObjectLayout[] = [
   },
   {
     id: 'waterPlant',
-    label: '물·식물',
+    label: '물 마시기',
     x: 56,
     y: 262,
     width: 74,
@@ -146,11 +196,11 @@ export const isometricRoomObjects: IsometricRoomObjectLayout[] = [
   {
     id: 'bookshelf',
     label: '책장',
-    x: 562,
-    y: 138,
-    width: 72,
-    height: 144,
-    zIndex: 60,
+    x: isometricStudyBookshelfLayout.x,
+    y: isometricStudyBookshelfLayout.y,
+    width: isometricStudyBookshelfLayout.width,
+    height: isometricStudyBookshelfLayout.height,
+    zIndex: isometricStudyBookshelfLayout.zIndex,
     interactive: true,
   },
   {
@@ -175,10 +225,10 @@ export const isometricRoomObjects: IsometricRoomObjectLayout[] = [
   {
     id: 'questBoard',
     label: '오늘의 퀘스트',
-    x: 508,
-    y: 86,
-    width: 112,
-    height: 80,
+    x: 438,
+    y: 76,
+    width: 88,
+    height: 84,
     zIndex: 65,
     interactive: true,
   },
