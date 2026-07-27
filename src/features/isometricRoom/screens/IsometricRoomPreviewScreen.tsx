@@ -58,7 +58,7 @@ const routeByObject: Partial<Record<IsometricRoomObjectId, Href>> = {
   studyDesk: '/study-desk',
   bookshelf: '/bookshelf',
   showerDoor: '/shower',
-  questBoard: '/quests',
+  questBoard: '/quests' as Href,
   newspaper: '/newspaper',
   cleaningFloor: '/cleaning',
 };
