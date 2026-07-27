@@ -34,12 +34,14 @@ import {
 } from '../constants/isometricRoomLayout';
 import { useIsometricRoomProfile } from '../hooks/useIsometricRoomProfile';
 import { useIsometricCleaningState } from '../hooks/useIsometricCleaningState';
+import { useIsometricShowerState } from '../hooks/useIsometricShowerState';
 import { useIsometricStudyBooksState } from '../hooks/useIsometricStudyBooksState';
 import { useIsometricWaterPlantState } from '../hooks/useIsometricWaterPlantState';
 import type {
   IsometricCleaningStage,
   IsometricPlantStage,
   IsometricRoomObjectId,
+  IsometricShowerStage,
 } from '../types/isometricRoom';
 import { createPreviewIsometricStudyBooks } from '../utils/layoutIsometricStudyBooks';
 
@@ -50,6 +52,7 @@ type ViewportSize = {
 
 type BookPreviewMode = 'actual' | '0' | '3' | '6' | '10' | 'full';
 type CleaningPreviewMode = 'actual' | IsometricCleaningStage;
+type ShowerPreviewMode = 'actual' | IsometricShowerStage;
 
 const routeByObject: Partial<Record<IsometricRoomObjectId, Href>> = {
   studyDesk: '/study-desk',
@@ -75,6 +78,7 @@ export default function IsometricRoomPreviewScreen() {
   const router = useRouter();
   const profile = useIsometricRoomProfile();
   const cleaningState = useIsometricCleaningState();
+  const showerState = useIsometricShowerState();
   const waterPlantState = useIsometricWaterPlantState();
   const studyBooksState = useIsometricStudyBooksState();
   const [viewport, setViewport] = useState<ViewportSize>({ width: 0, height: 0 });
@@ -86,6 +90,7 @@ export default function IsometricRoomPreviewScreen() {
   const [previewPlantStage, setPreviewPlantStage] = useState<IsometricPlantStage | null>(null);
   const [previewBookMode, setPreviewBookMode] = useState<BookPreviewMode>('actual');
   const [previewCleaningMode, setPreviewCleaningMode] = useState<CleaningPreviewMode>('actual');
+  const [previewShowerMode, setPreviewShowerMode] = useState<ShowerPreviewMode>('actual');
   const [waterStatusVisible, setWaterStatusVisible] = useState(false);
   const [routeNotice, setRouteNotice] = useState<string | null>(null);
 
@@ -111,6 +116,9 @@ export default function IsometricRoomPreviewScreen() {
   const currentCleaningStage = previewCleaningMode === 'actual'
     ? cleaningState.stage
     : previewCleaningMode;
+  const currentShowerStage = previewShowerMode === 'actual'
+    ? showerState.stage
+    : previewShowerMode;
   const currentCharacter = MVP_CHARACTER_CATALOG.find((item) => item.id === currentCharacterId)
     ?? MVP_CHARACTER_CATALOG[0];
   const currentPet = MVP_PET_CATALOG.find((item) => item.id === currentPetId)
@@ -190,6 +198,13 @@ export default function IsometricRoomPreviewScreen() {
     setPreviewCleaningMode(mode);
     if (mode === 'actual') {
       void cleaningState.reload();
+    }
+  };
+
+  const selectShowerPreviewMode = (mode: ShowerPreviewMode) => {
+    setPreviewShowerMode(mode);
+    if (mode === 'actual') {
+      void showerState.reload();
     }
   };
 
@@ -284,6 +299,7 @@ export default function IsometricRoomPreviewScreen() {
               petIdOverride={previewPetId}
               plantCompleted={currentPlantCompleted}
               plantStage={currentPlantStage}
+              showerStage={currentShowerStage}
               showDebugHotspots={showDebugHotspots}
               studyBooks={currentStudyBooks}
             />
@@ -418,8 +434,35 @@ export default function IsometricRoomPreviewScreen() {
               />
             ))}
           </View>
+
+          <View style={styles.stateDivider} />
+
+          <View style={styles.stateHeader}>
+            <Text style={styles.stateTitle}>샤워</Text>
+            <Text style={styles.stateMeta}>
+              실제 {showerState.isCompleted ? '완료' : '미완료'}
+              {showerState.todayShowerCount > 0 ? ` · ${showerState.todayShowerCount}회` : ''}
+            </Text>
+          </View>
+          <View style={styles.stageRow}>
+            <PreviewButton
+              label="실제"
+              onPress={() => selectShowerPreviewMode('actual')}
+              selected={previewShowerMode === 'actual'}
+            />
+            <PreviewButton
+              label="미완료"
+              onPress={() => selectShowerPreviewMode(0)}
+              selected={previewShowerMode === 0}
+            />
+            <PreviewButton
+              label="완료"
+              onPress={() => selectShowerPreviewMode(1)}
+              selected={previewShowerMode === 1}
+            />
+          </View>
           <Text style={styles.stateHelp}>
-            개발 전환은 화면 state만 바꾸며 물 기록·공부 기록·청소 기록·AsyncStorage·Firestore에는 저장하지 않아요.
+            개발 전환은 화면 state만 바꾸며 물 기록·공부 기록·청소 기록·샤워 기록·AsyncStorage·Firestore에는 저장하지 않아요.
           </Text>
         </ScrollView>
       ) : null}

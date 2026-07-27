@@ -103,6 +103,14 @@ export const isometricCharacterLayout = createBottomCenterLayout(
   80,
 ) satisfies LayerLayout;
 
+export const isometricFreshnessEffectLayout = {
+  x: isometricCharacterLayout.x - 8,
+  y: isometricCharacterLayout.y - 9,
+  width: isometricCharacterLayout.width + 16,
+  height: isometricCharacterLayout.height + 14,
+  zIndex: isometricCharacterLayout.zIndex + 2,
+} satisfies IsometricRoomRect & { zIndex: number };
+
 export const isometricPetLayout = createBottomCenterLayout(
   isometricPetAnchor.x,
   isometricPetAnchor.y,

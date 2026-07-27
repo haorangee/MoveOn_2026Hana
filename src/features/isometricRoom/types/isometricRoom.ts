@@ -15,9 +15,11 @@ export type IsometricRoomObjectId =
 export type VacuumCleanerState = 'idle' | 'active';
 export type IsometricPlantStage = 0 | 1 | 2 | 3 | 4 | 5;
 export type IsometricCleaningStage = 0 | 1 | 2 | 3;
+export type IsometricShowerStage = 0 | 1;
 export type IsometricStudyShelfRowId = 'bottom' | 'top';
 
 export type IsometricCleaningMessType = 'paper' | 'dust' | 'cloth' | 'wrapper';
+export type IsometricFreshnessEffectType = 'sparkle' | 'dot' | 'droplet';
 
 export interface IsometricRoomRect {
   x: number;
@@ -51,4 +53,14 @@ export interface IsometricCleaningMessItem extends IsometricRoomRect {
   rotation?: `${number}deg`;
   visibleUntilStage: IsometricCleaningStage;
   zIndex: number;
+}
+
+export interface IsometricFreshnessEffectItem {
+  id: string;
+  type: IsometricFreshnessEffectType;
+  x: number;
+  y: number;
+  size: number;
+  opacity: number;
+  rotation?: `${number}deg`;
 }
