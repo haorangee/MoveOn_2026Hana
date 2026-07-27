@@ -5,6 +5,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -32,9 +33,11 @@ import {
   ROOM_DESIGN_WIDTH,
 } from '../constants/isometricRoomLayout';
 import { useIsometricRoomProfile } from '../hooks/useIsometricRoomProfile';
+import { useIsometricCleaningState } from '../hooks/useIsometricCleaningState';
 import { useIsometricStudyBooksState } from '../hooks/useIsometricStudyBooksState';
 import { useIsometricWaterPlantState } from '../hooks/useIsometricWaterPlantState';
 import type {
+  IsometricCleaningStage,
   IsometricPlantStage,
   IsometricRoomObjectId,
 } from '../types/isometricRoom';
@@ -46,6 +49,7 @@ type ViewportSize = {
 };
 
 type BookPreviewMode = 'actual' | '0' | '3' | '6' | '10' | 'full';
+type CleaningPreviewMode = 'actual' | IsometricCleaningStage;
 
 const routeByObject: Partial<Record<IsometricRoomObjectId, Href>> = {
   studyDesk: '/study-desk',
@@ -57,6 +61,7 @@ const routeByObject: Partial<Record<IsometricRoomObjectId, Href>> = {
 };
 
 const previewStages: Array<IsometricPlantStage> = [0, 1, 2, 3, 4, 5];
+const cleaningPreviewStages: IsometricCleaningStage[] = [0, 1, 2, 3];
 const bookPreviewModes: Array<{ label: string; mode: BookPreviewMode }> = [
   { label: '실제', mode: 'actual' },
   { label: '0', mode: '0' },
@@ -69,6 +74,7 @@ const bookPreviewModes: Array<{ label: string; mode: BookPreviewMode }> = [
 export default function IsometricRoomPreviewScreen() {
   const router = useRouter();
   const profile = useIsometricRoomProfile();
+  const cleaningState = useIsometricCleaningState();
   const waterPlantState = useIsometricWaterPlantState();
   const studyBooksState = useIsometricStudyBooksState();
   const [viewport, setViewport] = useState<ViewportSize>({ width: 0, height: 0 });
@@ -79,6 +85,7 @@ export default function IsometricRoomPreviewScreen() {
   const [previewPetId, setPreviewPetId] = useState<MvpPetId | null>(null);
   const [previewPlantStage, setPreviewPlantStage] = useState<IsometricPlantStage | null>(null);
   const [previewBookMode, setPreviewBookMode] = useState<BookPreviewMode>('actual');
+  const [previewCleaningMode, setPreviewCleaningMode] = useState<CleaningPreviewMode>('actual');
   const [waterStatusVisible, setWaterStatusVisible] = useState(false);
   const [routeNotice, setRouteNotice] = useState<string | null>(null);
 
@@ -101,6 +108,9 @@ export default function IsometricRoomPreviewScreen() {
   const currentPlantCompleted = currentPlantStage >= 5 || (
     previewPlantStage === null && waterPlantState.isCompleted
   );
+  const currentCleaningStage = previewCleaningMode === 'actual'
+    ? cleaningState.stage
+    : previewCleaningMode;
   const currentCharacter = MVP_CHARACTER_CATALOG.find((item) => item.id === currentCharacterId)
     ?? MVP_CHARACTER_CATALOG[0];
   const currentPet = MVP_PET_CATALOG.find((item) => item.id === currentPetId)
@@ -173,6 +183,13 @@ export default function IsometricRoomPreviewScreen() {
     setPreviewBookMode(mode);
     if (mode === 'actual') {
       void studyBooksState.reload();
+    }
+  };
+
+  const selectCleaningPreviewMode = (mode: CleaningPreviewMode) => {
+    setPreviewCleaningMode(mode);
+    if (mode === 'actual') {
+      void cleaningState.reload();
     }
   };
 
@@ -262,6 +279,7 @@ export default function IsometricRoomPreviewScreen() {
           >
             <IsometricRoomScene
               characterIdOverride={previewCharacterId}
+              cleaningStage={currentCleaningStage}
               onObjectPress={openRoute}
               petIdOverride={previewPetId}
               plantCompleted={currentPlantCompleted}
@@ -331,7 +349,11 @@ export default function IsometricRoomPreviewScreen() {
       ) : null}
 
       {__DEV__ && showStatePanel ? (
-        <View style={styles.statePanel}>
+        <ScrollView
+          style={styles.statePanel}
+          contentContainerStyle={styles.statePanelContent}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.stateHeader}>
             <Text style={styles.stateTitle}>화분 단계</Text>
             <Text style={styles.stateMeta}>
@@ -372,10 +394,34 @@ export default function IsometricRoomPreviewScreen() {
               />
             ))}
           </View>
+
+          <View style={styles.stateDivider} />
+
+          <View style={styles.stateHeader}>
+            <Text style={styles.stateTitle}>청소</Text>
+            <Text style={styles.stateMeta}>
+              실제 {cleaningState.todayCleaningCount} / 3회 · stage {cleaningState.stage}
+            </Text>
+          </View>
+          <View style={styles.stageRow}>
+            <PreviewButton
+              label="실제"
+              onPress={() => selectCleaningPreviewMode('actual')}
+              selected={previewCleaningMode === 'actual'}
+            />
+            {cleaningPreviewStages.map((stage) => (
+              <PreviewButton
+                key={stage}
+                label={String(stage)}
+                onPress={() => selectCleaningPreviewMode(stage)}
+                selected={previewCleaningMode === stage}
+              />
+            ))}
+          </View>
           <Text style={styles.stateHelp}>
-            개발 전환은 화면 state만 바꾸며 물 기록·공부 기록·AsyncStorage·Firestore에는 저장하지 않아요.
+            개발 전환은 화면 state만 바꾸며 물 기록·공부 기록·청소 기록·AsyncStorage·Firestore에는 저장하지 않아요.
           </Text>
-        </View>
+        </ScrollView>
       ) : null}
 
       <View style={styles.footer}>
@@ -628,6 +674,9 @@ const styles = StyleSheet.create({
   statePanel: {
     marginHorizontal: 16,
     marginBottom: 8,
+    maxHeight: 230,
+  },
+  statePanelContent: {
     padding: 12,
     borderRadius: 18,
     borderWidth: 1,

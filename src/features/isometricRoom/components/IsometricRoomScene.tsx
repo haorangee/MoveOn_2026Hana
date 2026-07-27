@@ -6,6 +6,7 @@ import {
   ROOM_DESIGN_WIDTH,
 } from '../constants/isometricRoomLayout';
 import { IsometricCharacterLayer } from './IsometricCharacterLayer';
+import { IsometricCleaningMessLayer } from './IsometricCleaningMessLayer';
 import { IsometricPetLayer } from './IsometricPetLayer';
 import { IsometricRoomArtwork } from './IsometricRoomArtwork';
 import { IsometricStudyBooksLayer } from './IsometricStudyBooksLayer';
@@ -14,6 +15,7 @@ import { RoomHotspot } from './RoomHotspot';
 import { VacuumCleanerLayer } from './VacuumCleanerLayer';
 import { useIsometricRoomProfile } from '../hooks/useIsometricRoomProfile';
 import type {
+  IsometricCleaningStage,
   IsometricPlantStage,
   IsometricRoomObjectId,
   IsometricStudyBookVisual,
@@ -24,6 +26,7 @@ const CLEANING_START_DELAY_MS = 400;
 
 type IsometricRoomSceneProps = {
   characterIdOverride?: string | null;
+  cleaningStage?: IsometricCleaningStage;
   plantStage?: IsometricPlantStage;
   plantCompleted?: boolean;
   petIdOverride?: string | null;
@@ -34,6 +37,7 @@ type IsometricRoomSceneProps = {
 
 export function IsometricRoomScene({
   characterIdOverride,
+  cleaningStage = 0,
   onObjectPress,
   plantCompleted = false,
   plantStage = 0,
@@ -86,6 +90,7 @@ export function IsometricRoomScene({
           stage={plantStage}
         />
         <IsometricStudyBooksLayer books={studyBooks} />
+        <IsometricCleaningMessLayer stage={cleaningStage} />
         <VacuumCleanerLayer state={vacuumState} />
         <IsometricCharacterLayer characterId={characterId} />
         <IsometricPetLayer
