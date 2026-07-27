@@ -1,6 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  getMvpCharacterCatalogItem,
+  isMvpCharacterId,
+} from '@/features/customization/catalogs/characterCatalog';
 import { getCharacterOption } from '@/features/onboarding/onboardingData';
 import { useOnboarding } from '@/features/onboarding/OnboardingProvider';
 
@@ -10,13 +14,15 @@ type TopGameStatusProps = {
 
 export function TopGameStatus({ onSettingsPress }: TopGameStatusProps) {
   const { profile } = useOnboarding();
-  const character = getCharacterOption(profile.characterId);
+  const characterSource = isMvpCharacterId(profile.characterId)
+    ? getMvpCharacterCatalogItem(profile.characterId).source
+    : getCharacterOption(profile.characterId).image;
 
   return (
     <View style={styles.container} pointerEvents="box-none">
       <View style={styles.identityPill}>
         <View style={styles.avatar}>
-          <Image contentFit="contain" source={character.image} style={styles.avatarImage} />
+          <Image contentFit="contain" source={characterSource} style={styles.avatarImage} />
         </View>
         <View>
           <Text style={styles.roomName}>{profile.name || '나'}의 방</Text>
