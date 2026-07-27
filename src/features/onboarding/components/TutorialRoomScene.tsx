@@ -74,7 +74,7 @@ const characterAnchors: Record<Exclude<TutorialCharacterActivity, 'auto'>, { x: 
 };
 
 type TutorialRoomSceneProps = PropsWithChildren<{
-  characterId: CharacterId;
+  characterId: string;
   petSpecies: PetSpecies;
   highlightedObject?: TutorialObjectId | null;
   message?: string;

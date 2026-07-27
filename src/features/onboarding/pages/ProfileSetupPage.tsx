@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import { Image, type ImageSource } from 'expo-image';
 import { useMemo, useState } from 'react';
 import {
   Pressable,
@@ -10,6 +10,21 @@ import {
   View,
 } from 'react-native';
 import {
+  MVP_CHARACTER_CATALOG,
+  isMvpCharacterId,
+} from '@/features/customization/catalogs/characterCatalog';
+import {
+  MVP_PET_CATALOG,
+  getMvpPetCatalogItem,
+  isMvpPetId,
+} from '@/features/customization/catalogs/petCatalog';
+import type {
+  MvpCharacterCatalogItem,
+  MvpCharacterGender,
+  MvpPetCatalogItem,
+  MvpPetSpecies,
+} from '@/features/customization/types/customization';
+import {
   birthDateFromAge,
   createBirthDate,
   getBirthDateParts,
@@ -18,21 +33,30 @@ import {
   chapterOptions,
   type OnboardingState,
 } from '@/features/onboarding/domain/onboardingState';
-import {
-  characterOptions,
-  getPetOption,
-  petOptions,
-} from '@/features/onboarding/onboardingData';
 
 const setupCopy = [
-  { title: '당신을 어떻게 부르면 될까요?', description: '방과 신문에 사용할 닉네임이에요.' },
-  { title: '함께 지낼 친구를 골라주세요', description: '내 방에서 함께 살아갈 펫이에요.' },
+  { title: '당신을 어떻게 부르면 좋을까요?', description: '방과 신문에 사용할 이름이에요.' },
+  { title: '함께 지낼 펫을 골라주세요', description: '당신의 작은 행동 곁에서 응원해 줄 친구예요.' },
   { title: '친구의 이름은 무엇인가요?', description: '매일 다정하게 불러줄 이름을 지어주세요.' },
   { title: '생년월일을 알려주세요', description: '나이에 맞는 편안한 경험을 준비할게요.' },
-  { title: '이 방에서 살아갈 나를 골라주세요', description: '꾸미기 기능은 이후에도 바꿀 수 있어요.' },
-  { title: '지금 어떤 시간을 보내고 있나요?', description: '추천과 신문 문구에만 가볍게 활용해요.' },
-  { title: '새로운 Times를 알려드릴까요?', description: '주간과 월간 신문이 발행될 때만 안내해요.' },
+  { title: '나를 닮은 캐릭터를 골라주세요', description: '나중에 프로필에서 다시 바꿀 수 있어요.' },
+  { title: '지금 어떤 시간을 보내고 있나요?', description: '추천과 신문 문구에만 가볍게 사용할게요.' },
+  { title: 'Move On Times를 알려드릴까요?', description: '주간·월간 신문이 발행될 때만 안내해요.' },
 ] as const;
+
+type PetFilter = 'all' | MvpPetSpecies | 'small';
+
+const petFilters: Array<{ id: PetFilter; label: string }> = [
+  { id: 'all', label: '전체' },
+  { id: 'dog', label: '강아지' },
+  { id: 'cat', label: '고양이' },
+  { id: 'small', label: '소동물' },
+];
+
+const genderTabs: Array<{ id: MvpCharacterGender; label: string }> = [
+  { id: 'female', label: '여자' },
+  { id: 'male', label: '남자' },
+];
 
 type ProfileSetupPageProps = {
   state: OnboardingState;
@@ -46,21 +70,52 @@ export function ProfileSetupPage({ state, update, onDone }: ProfileSetupPageProp
   const [birthMonth, setBirthMonth] = useState(initialBirthDate.month);
   const [birthDay, setBirthDay] = useState(initialBirthDate.day);
   const [touched, setTouched] = useState(false);
+  const [petFilter, setPetFilter] = useState<PetFilter>('all');
+  const [characterGender, setCharacterGender] = useState<MvpCharacterGender>(
+    isMvpCharacterId(state.selectedCharacterId) && state.selectedCharacterId.startsWith('male-')
+      ? 'male'
+      : 'female',
+  );
+
   const step = state.profileSetupStep;
   const copy = setupCopy[step];
-  const selectedPet = getPetOption(state.selectedPetSpecies);
+  const selectedPet = isMvpPetId(state.selectedPetId)
+    ? getMvpPetCatalogItem(state.selectedPetId, state.selectedPetSpecies)
+    : null;
   const birthDate = useMemo(
     () => createBirthDate(birthYear, birthMonth, birthDay),
     [birthDay, birthMonth, birthYear],
   );
+  const filteredPets = useMemo(
+    () => MVP_PET_CATALOG.filter((pet) => {
+      if (petFilter === 'all') return true;
+      if (petFilter === 'small') return pet.species === 'hamster' || pet.species === 'squirrel';
+      return pet.species === petFilter;
+    }),
+    [petFilter],
+  );
+  const filteredCharacters = useMemo(
+    () => MVP_CHARACTER_CATALOG.filter((character) => character.gender === characterGender),
+    [characterGender],
+  );
 
   const canContinue = useMemo(() => {
     if (step === 0) return state.nickname.trim().length > 0;
+    if (step === 1) return isMvpPetId(state.selectedPetId);
     if (step === 2) return state.petName.trim().length > 0;
     if (step === 3) return birthDate !== null;
+    if (step === 4) return isMvpCharacterId(state.selectedCharacterId);
     if (step === 6) return state.magazineNotificationEnabled !== null;
     return true;
-  }, [birthDate, state.magazineNotificationEnabled, state.nickname, state.petName, step]);
+  }, [
+    birthDate,
+    state.magazineNotificationEnabled,
+    state.nickname,
+    state.petName,
+    state.selectedCharacterId,
+    state.selectedPetId,
+    step,
+  ]);
 
   const handleContinue = () => {
     setTouched(true);
@@ -107,36 +162,61 @@ export function ProfileSetupPage({ state, update, onDone }: ProfileSetupPageProp
         ) : null}
 
         {step === 1 ? (
-          <View style={styles.petGrid}>
-            {petOptions.map((pet) => {
-              const selected = pet.id === state.selectedPetSpecies;
-              return (
+          <View>
+            <View style={styles.segmentedTabs}>
+              {petFilters.map((filter) => (
                 <Pressable
-                  key={pet.id}
+                  key={filter.id}
                   accessibilityRole="button"
-                  onPress={() => update({ selectedPetSpecies: pet.id })}
+                  accessibilityState={{ selected: filter.id === petFilter }}
+                  onPress={() => setPetFilter(filter.id)}
                   style={({ pressed }) => [
-                    styles.petOption,
-                    selected && styles.selectedOption,
+                    styles.segmentedTab,
+                    filter.id === petFilter && styles.segmentedTabActive,
                     pressed && styles.pressed,
                   ]}
                 >
-                  <Image contentFit="contain" source={pet.image} style={styles.petImage} />
-                  <View style={styles.petCopy}>
-                    <Text style={styles.optionTitle}>{pet.name}</Text>
-                    <Text style={styles.optionDescription}>{pet.description}</Text>
-                  </View>
-                  {selected ? <Ionicons color="#78825F" name="checkmark-circle" size={20} /> : null}
+                  <Text style={[
+                    styles.segmentedTabText,
+                    filter.id === petFilter && styles.segmentedTabTextActive,
+                  ]}
+                  >
+                    {filter.label}
+                  </Text>
                 </Pressable>
-              );
-            })}
+              ))}
+            </View>
+            <View style={styles.cardGrid}>
+              {filteredPets.map((pet) => (
+                <PetCard
+                  key={pet.id}
+                  onPress={() => update({
+                    selectedPetId: pet.id,
+                    selectedPetSpecies: pet.species,
+                  })}
+                  pet={pet}
+                  selected={pet.id === state.selectedPetId}
+                />
+              ))}
+            </View>
+            {touched && !canContinue ? (
+              <Text style={styles.errorText}>함께 지낼 펫을 하나 골라주세요.</Text>
+            ) : null}
           </View>
         ) : null}
 
         {step === 2 ? (
           <View style={styles.centered}>
-            <Image contentFit="contain" source={selectedPet.image} style={styles.selectedPet} />
-            <Text style={styles.petPrompt}>{selectedPet.name}에게 어울리는 이름을 지어주세요.</Text>
+            {selectedPet ? (
+              <Image contentFit="contain" source={selectedPet.source as ImageSource} style={styles.selectedPet} />
+            ) : (
+              <View style={styles.emptyPetPreview}>
+                <Ionicons color="#8B9673" name="paw-outline" size={36} />
+              </View>
+            )}
+            <Text style={styles.petPrompt}>
+              {selectedPet ? `${selectedPet.displayName}에게 어울리는 이름을 지어주세요.` : '펫에게 어울리는 이름을 지어주세요.'}
+            </Text>
             <TextInput
               autoCorrect={false}
               maxLength={10}
@@ -165,37 +245,50 @@ export function ProfileSetupPage({ state, update, onDone }: ProfileSetupPageProp
         ) : null}
 
         {step === 4 ? (
-          <ScrollView
-            contentContainerStyle={styles.characterRail}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-          >
-            {characterOptions.map((character) => {
-              const selected = character.id === state.selectedCharacterId;
-              return (
+          <View>
+            <View style={styles.segmentedTabs}>
+              {genderTabs.map((tab) => (
                 <Pressable
-                  key={character.id}
+                  key={tab.id}
                   accessibilityRole="button"
-                  onPress={() => update({ selectedCharacterId: character.id })}
+                  accessibilityState={{ selected: tab.id === characterGender }}
+                  onPress={() => setCharacterGender(tab.id)}
                   style={({ pressed }) => [
-                    styles.characterOption,
-                    selected && styles.selectedCharacter,
+                    styles.segmentedTab,
+                    tab.id === characterGender && styles.segmentedTabActive,
                     pressed && styles.pressed,
                   ]}
                 >
-                  <Image contentFit="contain" source={character.image} style={styles.characterImage} />
-                  <Text style={styles.characterName}>{character.name}</Text>
-                  <Text style={styles.characterDescription}>{character.description}</Text>
-                  {selected ? <View style={styles.characterCheck}><Text style={styles.characterCheckText}>선택됨</Text></View> : null}
+                  <Text style={[
+                    styles.segmentedTabText,
+                    tab.id === characterGender && styles.segmentedTabTextActive,
+                  ]}
+                  >
+                    {tab.label}
+                  </Text>
                 </Pressable>
-              );
-            })}
-          </ScrollView>
+              ))}
+            </View>
+            <View style={styles.cardGrid}>
+              {filteredCharacters.map((character, index) => (
+                <CharacterCard
+                  character={character}
+                  displayName={`캐릭터 ${index + 1}`}
+                  key={character.id}
+                  onPress={() => update({ selectedCharacterId: character.id })}
+                  selected={character.id === state.selectedCharacterId}
+                />
+              ))}
+            </View>
+            {touched && !canContinue ? (
+              <Text style={styles.errorText}>내 방에서 살아갈 캐릭터를 하나 골라주세요.</Text>
+            ) : null}
+          </View>
         ) : null}
 
         {step === 5 ? (
           <View style={styles.optionList}>
-            {chapterOptions.map((chapter) => {
+            {chapterOptions.map((chapter, index) => {
               const selected = chapter.id === state.selectedChapter;
               return (
                 <Pressable
@@ -208,7 +301,7 @@ export function ProfileSetupPage({ state, update, onDone }: ProfileSetupPageProp
                     pressed && styles.pressed,
                   ]}
                 >
-                  <View style={styles.chapterNumber}><Text style={styles.chapterNumberText}>{chapterOptions.indexOf(chapter) + 1}</Text></View>
+                  <View style={styles.chapterNumber}><Text style={styles.chapterNumberText}>{index + 1}</Text></View>
                   <View style={styles.chapterCopy}>
                     <Text style={styles.optionTitle}>{chapter.label}</Text>
                     <Text style={styles.optionDescription}>{chapter.description}</Text>
@@ -246,7 +339,7 @@ export function ProfileSetupPage({ state, update, onDone }: ProfileSetupPageProp
             >
               <Ionicons color="#6D6255" name="time-outline" size={25} />
               <Text style={styles.notificationTitle}>나중에 설정하기</Text>
-              <Text style={styles.notificationDescription}>행동을 재촉하는 알림은 보내지 않아요.</Text>
+              <Text style={styles.notificationDescription}>행동을 방해하는 알림은 보내지 않아요.</Text>
             </Pressable>
           </View>
         ) : null}
@@ -268,6 +361,67 @@ export function ProfileSetupPage({ state, update, onDone }: ProfileSetupPageProp
         </Pressable>
       </View>
     </View>
+  );
+}
+
+type CharacterCardProps = {
+  character: MvpCharacterCatalogItem;
+  displayName: string;
+  onPress: () => void;
+  selected: boolean;
+};
+
+function CharacterCard({ character, displayName, onPress, selected }: CharacterCardProps) {
+  return (
+    <Pressable
+      accessibilityLabel={`${displayName} 선택`}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.characterOption,
+        selected && styles.selectedCharacter,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Image contentFit="contain" source={character.source as ImageSource} style={styles.characterImage} />
+      <Text style={styles.characterName}>{displayName}</Text>
+      {selected ? (
+        <View style={styles.characterCheck}>
+          <Ionicons color="#FFFFFF" name="checkmark" size={13} />
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
+
+type PetCardProps = {
+  onPress: () => void;
+  pet: MvpPetCatalogItem;
+  selected: boolean;
+};
+
+function PetCard({ onPress, pet, selected }: PetCardProps) {
+  return (
+    <Pressable
+      accessibilityLabel={`${pet.displayName} 선택`}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.petOption,
+        selected && styles.selectedOption,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Image contentFit="contain" source={pet.source as ImageSource} style={styles.petImage} />
+      <Text style={styles.optionTitle}>{pet.displayName}</Text>
+      {selected ? (
+        <View style={styles.petCheck}>
+          <Ionicons color="#FFFFFF" name="checkmark" size={13} />
+        </View>
+      ) : null}
+    </Pressable>
   );
 }
 
@@ -309,29 +463,32 @@ const styles = StyleSheet.create({
   textInput: { width: '100%', height: 60, paddingHorizontal: 18, borderWidth: 1.5, borderColor: '#D5CBBB', borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.72)', color: '#3D332A', fontSize: 19, fontWeight: '800', textAlign: 'center' },
   inputError: { borderColor: '#B98073' },
   hint: { marginTop: 11, color: '#938677', fontSize: 10, textAlign: 'center' },
-  errorText: { color: '#AF6F63' },
-  petGrid: { gap: 9 },
-  petOption: { minHeight: 94, padding: 10, borderWidth: 1.5, borderColor: '#DED5C8', borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.6)', flexDirection: 'row', alignItems: 'center' },
+  errorText: { marginTop: 12, color: '#AF6F63', fontSize: 11, fontWeight: '800', textAlign: 'center' },
+  segmentedTabs: { flexDirection: 'row', gap: 7, marginBottom: 15, padding: 5, borderRadius: 18, backgroundColor: 'rgba(232,224,211,0.72)' },
+  segmentedTab: { flex: 1, minHeight: 38, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  segmentedTabActive: { backgroundColor: '#FFF9EE', shadowColor: '#4C4033', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 2 },
+  segmentedTabText: { color: '#8B7E6E', fontSize: 11, fontWeight: '900' },
+  segmentedTabTextActive: { color: '#4B4138' },
+  cardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  petOption: { width: '48%', minHeight: 154, padding: 12, borderWidth: 1.5, borderColor: '#DED5C8', borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.66)', alignItems: 'center', justifyContent: 'center' },
   selectedOption: { borderColor: '#84906A', backgroundColor: '#F4F6EA' },
-  petImage: { width: 80, height: 74 },
-  petCopy: { flex: 1, paddingHorizontal: 10 },
-  optionTitle: { color: '#41372F', fontSize: 14, fontWeight: '900' },
+  petImage: { width: '100%', height: 92 },
+  optionTitle: { marginTop: 8, color: '#41372F', fontSize: 13, fontWeight: '900', textAlign: 'center' },
   optionDescription: { marginTop: 4, color: '#8A7C6D', fontSize: 9, lineHeight: 14 },
+  petCheck: { position: 'absolute', top: 10, right: 10, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#788360' },
   selectedPet: { width: 145, height: 145 },
-  petPrompt: { marginVertical: 12, color: '#786A5A', fontSize: 11, fontWeight: '700' },
+  emptyPetPreview: { width: 145, height: 145, borderRadius: 38, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E7EBD9' },
+  petPrompt: { marginVertical: 12, color: '#786A5A', fontSize: 11, fontWeight: '700', textAlign: 'center' },
   birthDateRow: { width: '100%', minHeight: 116, paddingHorizontal: 16, borderWidth: 1.5, borderColor: '#D4DCC1', borderRadius: 24, backgroundColor: '#EBEEDF', flexDirection: 'row', alignItems: 'center' },
   birthDivider: { width: 1, height: 48, backgroundColor: '#C9D0B6' },
   dateField: { flex: 1, alignItems: 'center' },
   dateInput: { width: '100%', minHeight: 48, padding: 0, color: '#46503A', fontSize: 26, lineHeight: 34, textAlign: 'center', fontVariant: ['tabular-nums'] },
   dateLabel: { color: '#737D61', fontSize: 10, fontWeight: '900' },
-  characterRail: { gap: 10, paddingRight: 20, paddingBottom: 8 },
-  characterOption: { width: 168, height: 330, padding: 10, borderWidth: 1.5, borderColor: '#DED4C5', borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.66)', overflow: 'hidden' },
+  characterOption: { width: '48%', height: 255, padding: 10, borderWidth: 1.5, borderColor: '#DED4C5', borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.66)', overflow: 'hidden', alignItems: 'center' },
   selectedCharacter: { borderColor: '#7E8B65', backgroundColor: '#F3F5E9' },
-  characterImage: { width: '100%', height: 240 },
-  characterName: { color: '#40362D', fontSize: 14, fontWeight: '900' },
-  characterDescription: { marginTop: 4, color: '#8B7D6F', fontSize: 9 },
-  characterCheck: { position: 'absolute', top: 10, right: 10, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 10, backgroundColor: '#788360' },
-  characterCheckText: { color: '#FFFFFF', fontSize: 8, fontWeight: '900' },
+  characterImage: { width: '100%', height: 202 },
+  characterName: { marginTop: 4, color: '#40362D', fontSize: 13, fontWeight: '900' },
+  characterCheck: { position: 'absolute', top: 10, right: 10, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#788360' },
   optionList: { gap: 10 },
   chapterOption: { minHeight: 72, paddingHorizontal: 14, borderWidth: 1.5, borderColor: '#DDD3C5', borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.65)', flexDirection: 'row', alignItems: 'center' },
   chapterNumber: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E9E2D5' },

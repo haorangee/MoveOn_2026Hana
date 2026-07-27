@@ -7,7 +7,7 @@ const flowLabels = ['책장 선택', '코딩 선택', '시간 기록', '파란 �
 const CODING_BLUE = '#5F82AE';
 
 type StudyTutorialPageProps = {
-  characterId: CharacterId;
+  characterId: string;
   petSpecies: PetSpecies;
   onContinue: () => void;
 };

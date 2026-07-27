@@ -25,7 +25,7 @@ const messages: Record<TutorialObjectId, string> = {
 };
 
 type RoomTutorialPageProps = {
-  characterId: CharacterId;
+  characterId: string;
   petSpecies: PetSpecies;
   onDeskPress: () => void;
 };
