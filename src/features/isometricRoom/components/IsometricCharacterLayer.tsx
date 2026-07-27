@@ -37,9 +37,11 @@ export function IsometricCharacterLayer({ characterId }: IsometricCharacterLayer
 const styles = StyleSheet.create({
   layer: {
     position: 'absolute',
+    backgroundColor: 'transparent',
   },
   artwork: {
     width: '100%',
     height: '100%',
+    backgroundColor: 'transparent',
   },
 });

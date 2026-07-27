@@ -25,6 +25,8 @@ import type {
 } from '@/features/customization/types/customization';
 import { IsometricRoomScene } from '../components/IsometricRoomScene';
 import {
+  isometricCharacterAnchor,
+  isometricPetAnchor,
   ROOM_DESIGN_HEIGHT,
   ROOM_DESIGN_WIDTH,
 } from '../constants/isometricRoomLayout';
@@ -251,6 +253,11 @@ export default function IsometricRoomPreviewScreen() {
           >
             <Text style={styles.avatarRestoreText}>프로필 값으로 복원</Text>
           </Pressable>
+          <Text style={styles.avatarAnchorText}>
+            Character anchor: {isometricCharacterAnchor.x}, {isometricCharacterAnchor.y}
+            {' · '}
+            Pet anchor: {isometricPetAnchor.x}, {isometricPetAnchor.y}
+          </Text>
         </View>
       ) : null}
 
@@ -474,6 +481,12 @@ const styles = StyleSheet.create({
     color: '#FFF9EF',
     fontSize: 11,
     fontWeight: '900',
+  },
+  avatarAnchorText: {
+    color: '#9A8978',
+    fontSize: 10,
+    fontWeight: '800',
+    textAlign: 'right',
   },
   pressed: {
     opacity: 0.82,

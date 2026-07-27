@@ -13,6 +13,37 @@ type VacuumCleanerLayout = Pick<
   'height' | 'rotation' | 'width' | 'x' | 'y' | 'zIndex'
 >;
 
+function createBottomCenterLayout(
+  anchorX: number,
+  anchorY: number,
+  width: number,
+  height: number,
+  zIndex: number,
+) {
+  return {
+    x: anchorX - width / 2,
+    y: anchorY - height,
+    width,
+    height,
+    zIndex,
+  };
+}
+
+export const isometricFloorSafeArea = {
+  characterAnchor: {
+    minX: 300,
+    maxX: 490,
+    minY: 350,
+    maxY: 440,
+  },
+  petAnchor: {
+    minX: 320,
+    maxX: 500,
+    minY: 350,
+    maxY: 430,
+  },
+};
+
 export const vacuumCleanerIdleLayout = {
   x: 190,
   y: 145,
@@ -47,21 +78,31 @@ export const vacuumCleanerIdleHotspotLayout = {
   rotation: vacuumCleanerIdleLayout.rotation,
 } satisfies VacuumCleanerLayout;
 
-export const isometricCharacterLayout = {
-  x: 384,
-  y: 332,
-  width: 96,
-  height: 128,
-  zIndex: 72,
-} satisfies VacuumCleanerLayout;
+export const isometricCharacterAnchor = {
+  x: 395,
+  y: 425,
+};
 
-export const isometricPetLayout = {
-  x: 482,
-  y: 398,
-  width: 58,
-  height: 58,
-  zIndex: 73,
-} satisfies VacuumCleanerLayout;
+export const isometricPetAnchor = {
+  x: 460,
+  y: 415,
+};
+
+export const isometricCharacterLayout = createBottomCenterLayout(
+  isometricCharacterAnchor.x,
+  isometricCharacterAnchor.y,
+  115,
+  155,
+  80,
+) satisfies VacuumCleanerLayout;
+
+export const isometricPetLayout = createBottomCenterLayout(
+  isometricPetAnchor.x,
+  isometricPetAnchor.y,
+  62,
+  62,
+  81,
+) satisfies VacuumCleanerLayout;
 
 export const isometricRoomObjects: IsometricRoomObjectLayout[] = [
   {
