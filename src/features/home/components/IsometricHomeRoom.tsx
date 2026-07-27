@@ -172,9 +172,10 @@ const styles = StyleSheet.create({
   },
   roomStage: {
     flex: 1,
+    paddingTop: 76,
     paddingHorizontal: 10,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
   sceneViewport: {
     alignItems: 'center',
