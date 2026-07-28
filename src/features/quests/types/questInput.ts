@@ -4,6 +4,7 @@ import type {
   QuestDifficulty,
   QuestSource,
 } from '../../../contracts/quest';
+import type { AIQuestExecutionType, AIQuestLevel } from '../../../contracts/ai-quest';
 import type { ActivityCategory } from '../../activity/constants/activityCategory';
 
 export interface CreateQuestInput {
@@ -17,6 +18,8 @@ export interface CreateQuestInput {
   source: QuestSource;
   scheduledDate: string;
   recommendationReason?: string;
+  executionType?: AIQuestExecutionType;
+  aiQuestLevel?: AIQuestLevel;
 }
 
 export interface UpdateQuestInput {
@@ -29,6 +32,8 @@ export interface UpdateQuestInput {
   difficulty?: QuestDifficulty;
   scheduledDate?: string;
   recommendationReason?: string | null;
+  executionType?: AIQuestExecutionType | null;
+  aiQuestLevel?: AIQuestLevel | null;
 }
 
 export interface CompleteQuestInput {

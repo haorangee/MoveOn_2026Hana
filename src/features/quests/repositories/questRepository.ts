@@ -27,6 +27,7 @@ import type {
   QuestSource,
   QuestStatus,
 } from '../../../contracts/quest';
+import type { AIQuestExecutionType, AIQuestLevel } from '../../../contracts/ai-quest';
 import type {
   CreateQuestInput,
   UpdateQuestInput,
@@ -35,6 +36,8 @@ import type {
 const QUEST_STATUS_VALUES = ['pending', 'completed', 'skipped'] as const;
 const QUEST_DIFFICULTY_VALUES = ['easy', 'normal', 'hard'] as const;
 const QUEST_SOURCE_VALUES = ['system', 'user', 'ai', 'fallback'] as const;
+const AI_QUEST_EXECUTION_TYPE_VALUES = ['simple', 'study', 'cleaning', 'shower', 'water', 'my_time'] as const;
+const AI_QUEST_LEVEL_VALUES = ['very_easy', 'easy', 'action'] as const;
 
 function questCollectionRef(userId: string) {
   return collection(firestore, 'users', userId, 'quests');
@@ -66,6 +69,14 @@ function isQuestDifficulty(value: unknown): value is QuestDifficulty {
 
 function isQuestSource(value: unknown): value is QuestSource {
   return QUEST_SOURCE_VALUES.includes(value as QuestSource);
+}
+
+function isAIQuestExecutionType(value: unknown): value is AIQuestExecutionType {
+  return AI_QUEST_EXECUTION_TYPE_VALUES.includes(value as AIQuestExecutionType);
+}
+
+function isAIQuestLevel(value: unknown): value is AIQuestLevel {
+  return AI_QUEST_LEVEL_VALUES.includes(value as AIQuestLevel);
 }
 
 function normalizeOptionalText(value: unknown) {
@@ -133,6 +144,8 @@ function fallbackQuest(
     status: 'pending',
     scheduledDate: input.scheduledDate,
     ...(input.recommendationReason ? { recommendationReason: input.recommendationReason } : {}),
+    ...(input.executionType ? { executionType: input.executionType } : {}),
+    ...(input.aiQuestLevel ? { aiQuestLevel: input.aiQuestLevel } : {}),
     activityId: null,
     completedAt: null,
     skippedAt: null,
@@ -158,6 +171,8 @@ function buildCreateData(
     status: 'pending',
     scheduledDate: input.scheduledDate,
     recommendationReason: input.recommendationReason ?? null,
+    executionType: input.executionType ?? null,
+    aiQuestLevel: input.aiQuestLevel ?? null,
     activityId: null,
     completedAt: null,
     skippedAt: null,
@@ -190,6 +205,8 @@ export function mapQuestSnapshot(
   const customCategoryLabel = normalizeOptionalText(data.customCategoryLabel);
   const recommendationReason = normalizeOptionalText(data.recommendationReason);
   const rewardCategory = isActivityCategory(data.rewardCategory) ? data.rewardCategory : null;
+  const executionType = isAIQuestExecutionType(data.executionType) ? data.executionType : undefined;
+  const aiQuestLevel = isAIQuestLevel(data.aiQuestLevel) ? data.aiQuestLevel : undefined;
   const activityId = normalizeOptionalText(data.activityId) ?? null;
 
   return {
@@ -205,6 +222,8 @@ export function mapQuestSnapshot(
     status: isQuestStatus(data.status) ? data.status : 'pending',
     scheduledDate: normalizeScheduledDate(data.scheduledDate),
     ...(recommendationReason ? { recommendationReason } : {}),
+    ...(executionType ? { executionType } : {}),
+    ...(aiQuestLevel ? { aiQuestLevel } : {}),
     activityId,
     completedAt: normalizeDateTime(data.completedAt),
     skippedAt: normalizeDateTime(data.skippedAt),

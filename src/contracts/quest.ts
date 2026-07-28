@@ -1,4 +1,5 @@
 import type { ActivityCategory } from '../features/activity/constants/activityCategory';
+import type { AIQuestExecutionType, AIQuestLevel } from './ai-quest';
 
 export type QuestCategory = ActivityCategory | 'custom';
 
@@ -36,6 +37,8 @@ export interface Quest {
   status: QuestStatus;
   scheduledDate: string;
   recommendationReason?: string;
+  executionType?: AIQuestExecutionType;
+  aiQuestLevel?: AIQuestLevel;
   activityId?: string | null;
   completedAt?: ContractDateTime;
   skippedAt?: ContractDateTime;
@@ -54,4 +57,6 @@ export interface QuestDraft {
   source: QuestSource;
   scheduledDate: string;
   recommendationReason?: string;
+  executionType?: AIQuestExecutionType;
+  aiQuestLevel?: AIQuestLevel;
 }
