@@ -8,7 +8,7 @@ import {
   useState,
 } from 'react';
 import type { UserProfile } from '@/contracts/user-profile';
-import type { MvpPetId } from '@/features/customization/types/customization';
+import type { MvpPetId, MvpPetSpecies } from '@/features/customization/types/customization';
 import { useAuth } from '@/features/auth/AuthProvider';
 import {
   recordFirebaseLogin,
@@ -188,6 +188,12 @@ type OnboardingContextValue = {
   isHydrated: boolean;
   isOnboarded: boolean;
   completeOnboarding: (profile: MoveOnProfile) => Promise<void>;
+  updateProfileCustomization: (patch: {
+    characterId: string;
+    petId: MvpPetId;
+    petSpecies: MvpPetSpecies;
+    petName: string;
+  }) => Promise<void>;
   resetOnboarding: () => Promise<void>;
 };
 
@@ -329,6 +335,39 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
         setSyncStatus('synced');
       } catch {
         setSyncStatus('offline');
+      }
+    },
+    updateProfileCustomization: async (patch) => {
+      if (!user) {
+        throw new Error('A Firebase user is required to save profile customization.');
+      }
+
+      const nextProfile: MoveOnProfile = {
+        ...profile,
+        characterId: patch.characterId,
+        petId: patch.petId,
+        petSpecies: patch.petSpecies,
+        petName: patch.petName,
+      };
+
+      setSyncStatus('syncing');
+      setUserId(user.uid);
+
+      try {
+        await AsyncStorage.setItem(
+          profileStorageKey(user.uid),
+          JSON.stringify(cachedProfilePayload(nextProfile, isOnboarded)),
+        );
+
+        if (isRegistered) {
+          await saveUserProfile(user.uid, toUserProfile(nextProfile));
+        }
+
+        setProfile(nextProfile);
+        setSyncStatus(isRegistered ? 'synced' : 'offline');
+      } catch (error) {
+        setSyncStatus('offline');
+        throw error;
       }
     },
     resetOnboarding: async () => {

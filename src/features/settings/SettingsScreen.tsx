@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -271,6 +271,20 @@ export function SettingsScreen() {
         </View>
 
         <Text style={styles.sectionTitle}>계정</Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/profile/customize' as Href)}
+          style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+        >
+          <View style={styles.rowIcon}>
+            <Ionicons color="#707B59" name="sparkles-outline" size={21} />
+          </View>
+          <View style={styles.rowCopy}>
+            <Text style={styles.rowTitle}>캐릭터·펫 변경</Text>
+            <Text style={styles.rowDescription}>내 방에 함께 있을 캐릭터와 펫을 다시 선택해요.</Text>
+          </View>
+          <Ionicons color="#8A7D6D" name="chevron-forward" size={18} />
+        </Pressable>
         <View style={styles.row}>
           <View style={styles.rowIcon}>
             <Ionicons color="#707B59" name="person-outline" size={21} />
