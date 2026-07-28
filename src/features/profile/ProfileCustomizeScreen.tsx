@@ -144,9 +144,7 @@ export function ProfileCustomizeScreen() {
         petName: trimmedPetName,
       });
 
-      Alert.alert('저장 완료', '내 방의 캐릭터와 펫이 바뀌었어요.', [
-        { text: '확인', onPress: () => router.replace('/settings' as Href) },
-      ]);
+      router.replace('/' as Href);
     } catch (error) {
       if (__DEV__) {
         console.warn('[ProfileCustomizeScreen] Failed to save customization.', error);
