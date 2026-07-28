@@ -1,17 +1,49 @@
-import { Image, StyleSheet, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import {
+  Animated,
+  Easing,
+  Image,
+  Platform,
+  StyleSheet,
+} from 'react-native';
 import { getMvpPetCatalogItem } from '@/features/customization/catalogs/petCatalog';
-import { isometricPetLayout } from '../constants/isometricRoomLayout';
+import { ISOMETRIC_PET_ESCAPE_ANIMATION_MS } from '../constants/isometricMovementLayout';
+import {
+  isometricPetAnchor,
+  isometricPetLayout,
+} from '../constants/isometricRoomLayout';
+import type { IsometricPetPosition } from '../types/isometricRoom';
 
 type IsometricPetLayerProps = {
   petId: string | null;
+  position?: IsometricPetPosition;
   petSpecies: string | null;
 };
 
-export function IsometricPetLayer({ petId, petSpecies }: IsometricPetLayerProps) {
+export function IsometricPetLayer({
+  petId,
+  petSpecies,
+  position,
+}: IsometricPetLayerProps) {
   const pet = getMvpPetCatalogItem(petId, petSpecies);
+  const movement = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const targetPosition = position ?? isometricPetAnchor;
+  const translateX = targetPosition.x - isometricPetAnchor.x;
+  const translateY = targetPosition.y - isometricPetAnchor.y;
+
+  useEffect(() => {
+    const animation = Animated.timing(movement, {
+      toValue: { x: translateX, y: translateY },
+      duration: ISOMETRIC_PET_ESCAPE_ANIMATION_MS,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: Platform.OS !== 'web',
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [movement, translateX, translateY]);
 
   return (
-    <View
+    <Animated.View
       pointerEvents="none"
       style={[
         styles.layer,
@@ -21,6 +53,10 @@ export function IsometricPetLayer({ petId, petSpecies }: IsometricPetLayerProps)
           width: isometricPetLayout.width,
           height: isometricPetLayout.height,
           zIndex: isometricPetLayout.zIndex,
+          transform: [
+            { translateX: movement.x },
+            { translateY: movement.y },
+          ],
         },
       ]}
     >
@@ -31,7 +67,7 @@ export function IsometricPetLayer({ petId, petSpecies }: IsometricPetLayerProps)
         source={pet.source}
         style={styles.artwork}
       />
-    </View>
+    </Animated.View>
   );
 }
 

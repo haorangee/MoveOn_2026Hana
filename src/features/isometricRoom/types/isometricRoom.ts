@@ -28,6 +28,11 @@ export interface IsometricCharacterPosition {
   y: number;
 }
 
+export interface IsometricPetPosition {
+  x: number;
+  y: number;
+}
+
 export interface IsometricMovementVector {
   dx: number;
   dy: number;

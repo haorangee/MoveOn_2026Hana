@@ -7,6 +7,7 @@ import type {
   IsometricMovementDirection,
   IsometricMovementVector,
   IsometricObstacle,
+  IsometricPetPosition,
   IsometricPoint,
 } from '../types/isometricRoom';
 
@@ -18,8 +19,15 @@ export const ISOMETRIC_MOVEMENT_STEP = 12;
 export const ISOMETRIC_CONTINUOUS_MOVE_INTERVAL_MS = 105;
 export const ISOMETRIC_STEP_ANIMATION_MS = 110;
 export const ISOMETRIC_POSITION_SAVE_DEBOUNCE_MS = 450;
+export const ISOMETRIC_PET_ESCAPE_ANIMATION_MS = 190;
+export const ISOMETRIC_PET_CHARACTER_MIN_DISTANCE = 42;
 
 export const ISOMETRIC_CHARACTER_COLLISION_RADIUS = {
+  horizontal: 15,
+  vertical: 8,
+};
+
+export const ISOMETRIC_PET_COLLISION_RADIUS = {
   horizontal: 18,
   vertical: 9,
 };
@@ -27,6 +35,11 @@ export const ISOMETRIC_CHARACTER_COLLISION_RADIUS = {
 export const DEFAULT_ISOMETRIC_CHARACTER_POSITION: IsometricCharacterPosition = {
   x: isometricCharacterAnchor.x,
   y: isometricCharacterAnchor.y,
+};
+
+export const DEFAULT_ISOMETRIC_PET_POSITION: IsometricPetPosition = {
+  x: isometricPetAnchor.x,
+  y: isometricPetAnchor.y,
 };
 
 export const ISOMETRIC_MOVEMENT_VECTORS: Record<
@@ -50,7 +63,7 @@ export const ISOMETRIC_WALKABLE_POLYGON: IsometricPoint[] = [
 
 // Furniture footprints are intentionally conservative for the MVP. They use
 // the same 768 x 512 design coordinates as isometricRoomLayout.ts.
-export const ISOMETRIC_MOVEMENT_OBSTACLES: IsometricObstacle[] = [
+export const ISOMETRIC_FIXED_MOVEMENT_OBSTACLES: IsometricObstacle[] = [
   {
     id: 'bed',
     polygon: [
@@ -131,15 +144,6 @@ export const ISOMETRIC_MOVEMENT_OBSTACLES: IsometricObstacle[] = [
       { x: 473, y: 340 },
       { x: 397, y: 396 },
       { x: 334, y: 368 },
-    ],
-  },
-  {
-    id: 'pet',
-    polygon: [
-      { x: isometricPetAnchor.x - 31, y: isometricPetAnchor.y - 42 },
-      { x: isometricPetAnchor.x + 31, y: isometricPetAnchor.y - 42 },
-      { x: isometricPetAnchor.x + 35, y: isometricPetAnchor.y + 7 },
-      { x: isometricPetAnchor.x - 35, y: isometricPetAnchor.y + 7 },
     ],
   },
 ];

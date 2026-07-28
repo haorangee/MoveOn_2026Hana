@@ -307,6 +307,7 @@ export default function IsometricRoomPreviewScreen() {
               onObjectPress={openRoute}
               onPressRoomFloor={movement.moveTowardPoint}
               petIdOverride={previewPetId}
+              petPosition={movement.petPosition}
               plantCompleted={currentPlantCompleted}
               plantStage={currentPlantStage}
               showerStage={currentShowerStage}
@@ -382,6 +383,9 @@ export default function IsometricRoomPreviewScreen() {
           </Text>
           <Text style={styles.avatarAnchorText}>
             Current position: {Math.round(movement.position.x)}, {Math.round(movement.position.y)}
+          </Text>
+          <Text style={styles.avatarAnchorText}>
+            Pet position: {Math.round(movement.petPosition.x)}, {Math.round(movement.petPosition.y)}
           </Text>
           <Pressable
             accessibilityLabel="캐릭터 위치 초기화"

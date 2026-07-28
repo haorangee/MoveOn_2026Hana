@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet } from 'react-native';
+import { Platform, Pressable, StyleSheet } from 'react-native';
 import type { IsometricCharacterPosition } from '../types/isometricRoom';
 
 type IsometricMovementTapSurfaceProps = {
@@ -17,10 +17,26 @@ export function IsometricMovementTapSurface({
       accessibilityRole="button"
       disabled={disabled}
       onPress={(event) => {
-        onPressFloor({
-          x: event.nativeEvent.locationX,
-          y: event.nativeEvent.locationY,
-        });
+        const webNativeEvent = event.nativeEvent as typeof event.nativeEvent & {
+          offsetX?: number;
+          offsetY?: number;
+        };
+        const locationX = Platform.OS === 'web'
+          ? webNativeEvent.offsetX
+          : event.nativeEvent.locationX;
+        const locationY = Platform.OS === 'web'
+          ? webNativeEvent.offsetY
+          : event.nativeEvent.locationY;
+
+        if (!Number.isFinite(locationX) || !Number.isFinite(locationY)) {
+          return;
+        }
+
+        const position = {
+          x: Number(locationX),
+          y: Number(locationY),
+        };
+        onPressFloor(position);
       }}
       style={styles.surface}
     />

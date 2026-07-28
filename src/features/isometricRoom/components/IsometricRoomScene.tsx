@@ -24,6 +24,7 @@ import type {
   IsometricCharacterFacingDirection,
   IsometricCharacterPosition,
   IsometricCleaningStage,
+  IsometricPetPosition,
   IsometricPlantStage,
   IsometricRoomObjectId,
   IsometricShowerStage,
@@ -44,6 +45,7 @@ type IsometricRoomSceneProps = {
   plantStage?: IsometricPlantStage;
   plantCompleted?: boolean;
   petIdOverride?: MvpPetId | null;
+  petPosition?: IsometricPetPosition;
   showerStage?: IsometricShowerStage;
   showDebugHotspots?: boolean;
   studyBooks?: IsometricStudyBookVisual[];
@@ -62,6 +64,7 @@ export function IsometricRoomScene({
   plantCompleted = false,
   plantStage = 0,
   petIdOverride,
+  petPosition,
   showerStage = 0,
   showDebugHotspots = false,
   studyBooks = [],
@@ -131,6 +134,7 @@ export function IsometricRoomScene({
         />
         <IsometricPetLayer
           petId={petId}
+          position={petPosition}
           petSpecies={profile.petSpecies}
         />
 

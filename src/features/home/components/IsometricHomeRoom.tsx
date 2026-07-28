@@ -157,6 +157,7 @@ export function IsometricHomeRoom() {
               movementDisabled={waterModalVisible}
               onObjectPress={handleObjectPress}
               onPressRoomFloor={movement.moveTowardPoint}
+              petPosition={movement.petPosition}
               plantCompleted={waterPlant.isCompleted}
               plantStage={waterPlant.stage}
               showerStage={shower.stage}

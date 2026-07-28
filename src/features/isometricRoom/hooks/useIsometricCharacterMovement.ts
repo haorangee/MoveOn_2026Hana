@@ -7,6 +7,7 @@ import {
 } from 'react';
 import {
   DEFAULT_ISOMETRIC_CHARACTER_POSITION,
+  DEFAULT_ISOMETRIC_PET_POSITION,
   ISOMETRIC_CHARACTER_POSITION_STORAGE_KEY,
   ISOMETRIC_CHARACTER_POSITION_STORAGE_VERSION,
   ISOMETRIC_CONTINUOUS_MOVE_INTERVAL_MS,
@@ -18,8 +19,10 @@ import type {
   IsometricCharacterFacingDirection,
   IsometricCharacterPosition,
   IsometricMovementDirection,
+  IsometricPetPosition,
 } from '../types/isometricRoom';
 import {
+  findPetEscapePosition,
   getValidCharacterPosition,
   isIsometricCharacterPositionValid,
   isTapPointOnWalkableFloor,
@@ -69,10 +72,14 @@ export function useIsometricCharacterMovement() {
   const [position, setPosition] = useState<IsometricCharacterPosition>(
     DEFAULT_ISOMETRIC_CHARACTER_POSITION,
   );
+  const [petPosition, setPetPosition] = useState<IsometricPetPosition>(
+    DEFAULT_ISOMETRIC_PET_POSITION,
+  );
   const [facingDirection, setFacingDirection] =
     useState<IsometricCharacterFacingDirection>('right');
   const [isMoving, setIsMoving] = useState(false);
   const positionRef = useRef(position);
+  const petPositionRef = useRef(petPosition);
   const mountedRef = useRef(true);
   const hydratedRef = useRef(false);
   const continuousMoveTimerRef =
@@ -121,16 +128,42 @@ export function useIsometricCharacterMovement() {
       || validPosition.y !== currentPosition.y
     );
 
-    if (didMove) {
-      positionRef.current = validPosition;
-      setPosition(validPosition);
+    if (!didMove) {
+      if (mountedRef.current) {
+        setIsMoving(false);
+      }
+      return false;
     }
+
+    const escapedPetPosition = findPetEscapePosition(
+      petPositionRef.current,
+      validPosition,
+      direction,
+    );
+
+    if (!escapedPetPosition) {
+      if (mountedRef.current) {
+        setIsMoving(false);
+      }
+      return false;
+    }
+
+    if (
+      escapedPetPosition.x !== petPositionRef.current.x
+      || escapedPetPosition.y !== petPositionRef.current.y
+    ) {
+      petPositionRef.current = escapedPetPosition;
+      setPetPosition(escapedPetPosition);
+    }
+
+    positionRef.current = validPosition;
+    setPosition(validPosition);
 
     if (mountedRef.current) {
-      setIsMoving(didMove && keepMoving);
+      setIsMoving(keepMoving);
     }
 
-    return didMove;
+    return true;
   }, []);
 
   const moveOneStep = useCallback((direction: IsometricMovementDirection) => {
@@ -177,7 +210,10 @@ export function useIsometricCharacterMovement() {
     stopMoving();
     const defaultPosition = { ...DEFAULT_ISOMETRIC_CHARACTER_POSITION };
     positionRef.current = defaultPosition;
+    const defaultPetPosition = { ...DEFAULT_ISOMETRIC_PET_POSITION };
+    petPositionRef.current = defaultPetPosition;
     setPosition(defaultPosition);
+    setPetPosition(defaultPetPosition);
     setFacingDirection('right');
   }, [stopMoving]);
 
@@ -192,8 +228,17 @@ export function useIsometricCharacterMovement() {
         const savedPosition = parseStoredPosition(savedValue);
         if (!active || !savedPosition) return;
 
+        const restoredPetPosition = findPetEscapePosition(
+          petPositionRef.current,
+          savedPosition,
+          'right',
+        );
+        if (!restoredPetPosition) return;
+
         positionRef.current = savedPosition;
+        petPositionRef.current = restoredPetPosition;
         setPosition(savedPosition);
+        setPetPosition(restoredPetPosition);
       } catch (error) {
         if (typeof __DEV__ !== 'undefined' && __DEV__) {
           console.warn('Failed to restore isometric character position.', error);
@@ -261,6 +306,7 @@ export function useIsometricCharacterMovement() {
 
   return {
     position,
+    petPosition,
     facingDirection,
     isMoving,
     moveOneStep,
