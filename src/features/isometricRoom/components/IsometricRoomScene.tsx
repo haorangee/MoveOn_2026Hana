@@ -8,6 +8,7 @@ import {
 import { IsometricCharacterLayer } from './IsometricCharacterLayer';
 import { IsometricCleaningMessLayer } from './IsometricCleaningMessLayer';
 import { IsometricFreshnessEffectLayer } from './IsometricFreshnessEffectLayer';
+import { IsometricMovementTapSurface } from './IsometricMovementTapSurface';
 import { IsometricPetLayer } from './IsometricPetLayer';
 import { IsometricRoomArtwork } from './IsometricRoomArtwork';
 import { IsometricStudyBooksLayer } from './IsometricStudyBooksLayer';
@@ -16,6 +17,12 @@ import { RoomHotspot } from './RoomHotspot';
 import { VacuumCleanerLayer } from './VacuumCleanerLayer';
 import { useIsometricRoomProfile } from '../hooks/useIsometricRoomProfile';
 import type {
+  MvpCharacterId,
+  MvpPetId,
+} from '@/features/customization/types/customization';
+import type {
+  IsometricCharacterFacingDirection,
+  IsometricCharacterPosition,
   IsometricCleaningStage,
   IsometricPlantStage,
   IsometricRoomObjectId,
@@ -27,11 +34,16 @@ import type {
 const CLEANING_START_DELAY_MS = 400;
 
 type IsometricRoomSceneProps = {
-  characterIdOverride?: string | null;
+  characterFacingDirection?: IsometricCharacterFacingDirection;
+  characterIdOverride?: MvpCharacterId | null;
+  characterIsMoving?: boolean;
+  characterPosition?: IsometricCharacterPosition;
   cleaningStage?: IsometricCleaningStage;
+  movementDisabled?: boolean;
+  onPressRoomFloor?: (position: IsometricCharacterPosition) => void;
   plantStage?: IsometricPlantStage;
   plantCompleted?: boolean;
-  petIdOverride?: string | null;
+  petIdOverride?: MvpPetId | null;
   showerStage?: IsometricShowerStage;
   showDebugHotspots?: boolean;
   studyBooks?: IsometricStudyBookVisual[];
@@ -39,9 +51,14 @@ type IsometricRoomSceneProps = {
 };
 
 export function IsometricRoomScene({
+  characterFacingDirection = 'right',
   characterIdOverride,
+  characterIsMoving = false,
+  characterPosition,
   cleaningStage = 0,
+  movementDisabled = false,
   onObjectPress,
+  onPressRoomFloor,
   plantCompleted = false,
   plantStage = 0,
   petIdOverride,
@@ -96,8 +113,22 @@ export function IsometricRoomScene({
         <IsometricStudyBooksLayer books={studyBooks} />
         <IsometricCleaningMessLayer stage={cleaningStage} />
         <VacuumCleanerLayer state={vacuumState} />
-        <IsometricCharacterLayer characterId={characterId} />
-        <IsometricFreshnessEffectLayer stage={showerStage} />
+        {onPressRoomFloor ? (
+          <IsometricMovementTapSurface
+            disabled={movementDisabled}
+            onPressFloor={onPressRoomFloor}
+          />
+        ) : null}
+        <IsometricCharacterLayer
+          characterId={characterId}
+          facingDirection={characterFacingDirection}
+          isMoving={characterIsMoving}
+          position={characterPosition}
+        />
+        <IsometricFreshnessEffectLayer
+          characterPosition={characterPosition}
+          stage={showerStage}
+        />
         <IsometricPetLayer
           petId={petId}
           petSpecies={profile.petSpecies}

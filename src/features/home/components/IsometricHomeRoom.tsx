@@ -11,12 +11,14 @@ import {
   useCleaningMission,
 } from '@/features/home/cleaningMission';
 import { IsometricRoomScene } from '@/features/isometricRoom/components/IsometricRoomScene';
+import { IsometricMovementControls } from '@/features/isometricRoom/components/IsometricMovementControls';
 import { WaterPlantStatusModal } from '@/features/isometricRoom/components/WaterPlantStatusModal';
 import {
   ROOM_DESIGN_HEIGHT,
   ROOM_DESIGN_WIDTH,
 } from '@/features/isometricRoom/constants/isometricRoomLayout';
 import { useIsometricCleaningState } from '@/features/isometricRoom/hooks/useIsometricCleaningState';
+import { useIsometricCharacterMovement } from '@/features/isometricRoom/hooks/useIsometricCharacterMovement';
 import { useIsometricShowerState } from '@/features/isometricRoom/hooks/useIsometricShowerState';
 import { useIsometricStudyBooksState } from '@/features/isometricRoom/hooks/useIsometricStudyBooksState';
 import { useIsometricWaterPlantState } from '@/features/isometricRoom/hooks/useIsometricWaterPlantState';
@@ -31,12 +33,17 @@ const objectRoutes: Partial<Record<IsometricRoomObjectId, Href>> = {
   studyDesk: '/study-desk' as Href,
 };
 
+const ROOM_TOP_INSET = 76;
+const MOVEMENT_CONTROLS_RESERVED_HEIGHT = 176;
+
 export function IsometricHomeRoom() {
   const router = useRouter();
   const waterPlant = useIsometricWaterPlantState();
   const studyBooks = useIsometricStudyBooksState();
   const cleaning = useIsometricCleaningState();
   const shower = useIsometricShowerState();
+  const movement = useIsometricCharacterMovement();
+  const stopMoving = movement.stopMoving;
   const reloadCleaningState = cleaning.reload;
   const {
     isHydrated: isCleaningMissionHydrated,
@@ -48,9 +55,13 @@ export function IsometricHomeRoom() {
 
   const sceneScale = useMemo(() => {
     if (stageSize.width <= 0 || stageSize.height <= 0) return 1;
+    const availableSceneHeight = Math.max(
+      1,
+      stageSize.height - ROOM_TOP_INSET - MOVEMENT_CONTROLS_RESERVED_HEIGHT,
+    );
     return Math.min(
       stageSize.width / ROOM_DESIGN_WIDTH,
-      stageSize.height / ROOM_DESIGN_HEIGHT,
+      availableSceneHeight / ROOM_DESIGN_HEIGHT,
     );
   }, [stageSize.height, stageSize.width]);
 
@@ -96,11 +107,14 @@ export function IsometricHomeRoom() {
   }, [isCleaningMissionHydrated, recordCleaningMission, reloadCleaningState]);
 
   const handleSettingsPress = useCallback(() => {
+    stopMoving();
     router.push('/settings' as Href);
-  }, [router]);
+  }, [router, stopMoving]);
 
   const handleObjectPress = useCallback(
     (objectId: IsometricRoomObjectId) => {
+      stopMoving();
+
       if (objectId === 'waterPlant') {
         void waterPlant.reload();
         setWaterModalVisible(true);
@@ -112,7 +126,7 @@ export function IsometricHomeRoom() {
 
       router.push(route);
     },
-    [router, waterPlant],
+    [router, stopMoving, waterPlant],
   );
 
   return (
@@ -136,8 +150,13 @@ export function IsometricHomeRoom() {
             ]}
           >
             <IsometricRoomScene
+              characterFacingDirection={movement.facingDirection}
+              characterIsMoving={movement.isMoving}
+              characterPosition={movement.position}
               cleaningStage={cleaning.stage}
+              movementDisabled={waterModalVisible}
               onObjectPress={handleObjectPress}
+              onPressRoomFloor={movement.moveTowardPoint}
               plantCompleted={waterPlant.isCompleted}
               plantStage={waterPlant.stage}
               showerStage={shower.stage}
@@ -145,6 +164,15 @@ export function IsometricHomeRoom() {
               studyBooks={studyBooks.visibleBooks}
             />
           </View>
+        </View>
+
+        <View style={styles.movementControls}>
+          <IsometricMovementControls
+            disabled={waterModalVisible}
+            onMove={movement.moveOneStep}
+            onStartMove={movement.startMoving}
+            onStopMove={movement.stopMoving}
+          />
         </View>
       </View>
 
@@ -172,7 +200,7 @@ const styles = StyleSheet.create({
   },
   roomStage: {
     flex: 1,
-    paddingTop: 76,
+    paddingTop: ROOM_TOP_INSET,
     paddingHorizontal: 10,
     alignItems: 'center',
     justifyContent: 'flex-start',
@@ -185,5 +213,11 @@ const styles = StyleSheet.create({
   sceneScaler: {
     width: ROOM_DESIGN_WIDTH,
     height: ROOM_DESIGN_HEIGHT,
+  },
+  movementControls: {
+    paddingTop: 4,
+    paddingBottom: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

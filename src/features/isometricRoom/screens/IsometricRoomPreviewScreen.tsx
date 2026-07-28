@@ -24,6 +24,7 @@ import type {
   MvpCharacterId,
   MvpPetId,
 } from '@/features/customization/types/customization';
+import { IsometricMovementControls } from '../components/IsometricMovementControls';
 import { IsometricRoomScene } from '../components/IsometricRoomScene';
 import { WaterPlantStatusModal } from '../components/WaterPlantStatusModal';
 import {
@@ -34,6 +35,7 @@ import {
 } from '../constants/isometricRoomLayout';
 import { useIsometricRoomProfile } from '../hooks/useIsometricRoomProfile';
 import { useIsometricCleaningState } from '../hooks/useIsometricCleaningState';
+import { useIsometricCharacterMovement } from '../hooks/useIsometricCharacterMovement';
 import { useIsometricShowerState } from '../hooks/useIsometricShowerState';
 import { useIsometricStudyBooksState } from '../hooks/useIsometricStudyBooksState';
 import { useIsometricWaterPlantState } from '../hooks/useIsometricWaterPlantState';
@@ -81,6 +83,7 @@ export default function IsometricRoomPreviewScreen() {
   const showerState = useIsometricShowerState();
   const waterPlantState = useIsometricWaterPlantState();
   const studyBooksState = useIsometricStudyBooksState();
+  const movement = useIsometricCharacterMovement();
   const [viewport, setViewport] = useState<ViewportSize>({ width: 0, height: 0 });
   const [showDebugHotspots, setShowDebugHotspots] = useState(false);
   const [showAvatarPanel, setShowAvatarPanel] = useState(false);
@@ -168,6 +171,8 @@ export default function IsometricRoomPreviewScreen() {
   };
 
   const openRoute = (objectId: IsometricRoomObjectId, label: string) => {
+    movement.stopMoving();
+
     if (objectId === 'waterPlant') {
       void waterPlantState.reload();
       setWaterStatusVisible(true);
@@ -293,9 +298,14 @@ export default function IsometricRoomPreviewScreen() {
             ]}
           >
             <IsometricRoomScene
+              characterFacingDirection={movement.facingDirection}
               characterIdOverride={previewCharacterId}
+              characterIsMoving={movement.isMoving}
+              characterPosition={movement.position}
               cleaningStage={currentCleaningStage}
+              movementDisabled={waterStatusVisible}
               onObjectPress={openRoute}
+              onPressRoomFloor={movement.moveTowardPoint}
               petIdOverride={previewPetId}
               plantCompleted={currentPlantCompleted}
               plantStage={currentPlantStage}
@@ -305,6 +315,15 @@ export default function IsometricRoomPreviewScreen() {
             />
           </View>
         </View>
+      </View>
+
+      <View style={styles.movementControls}>
+        <IsometricMovementControls
+          disabled={waterStatusVisible}
+          onMove={movement.moveOneStep}
+          onStartMove={movement.startMoving}
+          onStopMove={movement.stopMoving}
+        />
       </View>
 
       {__DEV__ && showAvatarPanel ? (
@@ -361,6 +380,17 @@ export default function IsometricRoomPreviewScreen() {
             {' · '}
             Pet anchor: {isometricPetAnchor.x}, {isometricPetAnchor.y}
           </Text>
+          <Text style={styles.avatarAnchorText}>
+            Current position: {Math.round(movement.position.x)}, {Math.round(movement.position.y)}
+          </Text>
+          <Pressable
+            accessibilityLabel="캐릭터 위치 초기화"
+            accessibilityRole="button"
+            onPress={movement.resetPosition}
+            style={({ pressed }) => [styles.avatarRestoreButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.avatarRestoreText}>위치 초기화</Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -634,6 +664,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: ROOM_DESIGN_WIDTH,
     height: ROOM_DESIGN_HEIGHT,
+  },
+  movementControls: {
+    marginTop: 2,
+    marginBottom: 8,
+    alignItems: 'center',
   },
   footer: {
     paddingHorizontal: 24,

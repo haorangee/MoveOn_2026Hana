@@ -6,17 +6,23 @@ import {
   View,
 } from 'react-native';
 import { isometricFreshnessEffectItems } from '../constants/isometricFreshnessEffectLayout';
-import { isometricFreshnessEffectLayout } from '../constants/isometricRoomLayout';
+import {
+  isometricCharacterAnchor,
+  isometricFreshnessEffectLayout,
+} from '../constants/isometricRoomLayout';
 import type {
+  IsometricCharacterPosition,
   IsometricFreshnessEffectItem,
   IsometricShowerStage,
 } from '../types/isometricRoom';
 
 type IsometricFreshnessEffectLayerProps = {
+  characterPosition?: IsometricCharacterPosition;
   stage: IsometricShowerStage;
 };
 
 export function IsometricFreshnessEffectLayer({
+  characterPosition,
   stage,
 }: IsometricFreshnessEffectLayerProps) {
   const pulse = useRef(new Animated.Value(0)).current;
@@ -58,6 +64,12 @@ export function IsometricFreshnessEffectLayer({
       outputRange: [0.52, 0.88],
     }),
   };
+  const offsetX = characterPosition
+    ? characterPosition.x - isometricCharacterAnchor.x
+    : 0;
+  const offsetY = characterPosition
+    ? characterPosition.y - isometricCharacterAnchor.y
+    : 0;
 
   return (
     <Animated.View
@@ -66,8 +78,8 @@ export function IsometricFreshnessEffectLayer({
         styles.layer,
         animatedStyle,
         {
-          left: isometricFreshnessEffectLayout.x,
-          top: isometricFreshnessEffectLayout.y,
+          left: isometricFreshnessEffectLayout.x + offsetX,
+          top: isometricFreshnessEffectLayout.y + offsetY,
           width: isometricFreshnessEffectLayout.width,
           height: isometricFreshnessEffectLayout.height,
           zIndex: isometricFreshnessEffectLayout.zIndex,

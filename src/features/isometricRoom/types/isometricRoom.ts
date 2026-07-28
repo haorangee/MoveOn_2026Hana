@@ -20,6 +20,28 @@ export type IsometricStudyShelfRowId = 'bottom' | 'top';
 
 export type IsometricCleaningMessType = 'paper' | 'dust' | 'cloth' | 'wrapper';
 export type IsometricFreshnessEffectType = 'sparkle' | 'dot' | 'droplet';
+export type IsometricMovementDirection = 'up' | 'down' | 'left' | 'right';
+export type IsometricCharacterFacingDirection = 'left' | 'right';
+
+export interface IsometricCharacterPosition {
+  x: number;
+  y: number;
+}
+
+export interface IsometricMovementVector {
+  dx: number;
+  dy: number;
+}
+
+export interface IsometricPoint {
+  x: number;
+  y: number;
+}
+
+export interface IsometricObstacle {
+  id: string;
+  polygon: IsometricPoint[];
+}
 
 export interface IsometricRoomRect {
   x: number;
