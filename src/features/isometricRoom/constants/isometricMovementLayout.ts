@@ -4,8 +4,6 @@ import {
 } from './isometricRoomLayout';
 import type {
   IsometricCharacterPosition,
-  IsometricMovementDirection,
-  IsometricMovementVector,
   IsometricObstacle,
   IsometricPetPosition,
   IsometricPoint,
@@ -15,12 +13,20 @@ export const ISOMETRIC_CHARACTER_POSITION_STORAGE_KEY =
   '@moveon/isometric-character-position/v1';
 export const ISOMETRIC_CHARACTER_POSITION_STORAGE_VERSION = 1;
 
-export const ISOMETRIC_MOVEMENT_STEP = 12;
-export const ISOMETRIC_CONTINUOUS_MOVE_INTERVAL_MS = 105;
-export const ISOMETRIC_STEP_ANIMATION_MS = 110;
+export const ISOMETRIC_JOYSTICK_BASE_SIZE = 136;
+export const ISOMETRIC_JOYSTICK_KNOB_SIZE = 54;
+export const ISOMETRIC_JOYSTICK_MAX_RADIUS = 41;
+export const ISOMETRIC_JOYSTICK_DEAD_ZONE = 10;
+export const ISOMETRIC_MIN_MOVEMENT_SPEED = 34;
+export const ISOMETRIC_MAX_MOVEMENT_SPEED = 114;
+export const ISOMETRIC_MAX_FRAME_DELTA_SECONDS = 0.05;
+export const ISOMETRIC_COLLISION_SUBSTEP_SIZE = 3;
+export const ISOMETRIC_TAP_MOVE_DISTANCE = 18;
+export const ISOMETRIC_TAP_MOVE_ANIMATION_MS = 150;
 export const ISOMETRIC_POSITION_SAVE_DEBOUNCE_MS = 450;
 export const ISOMETRIC_PET_ESCAPE_ANIMATION_MS = 190;
 export const ISOMETRIC_PET_CHARACTER_MIN_DISTANCE = 42;
+export const ISOMETRIC_FACING_HORIZONTAL_THRESHOLD = 0.08;
 
 export const ISOMETRIC_CHARACTER_COLLISION_RADIUS = {
   horizontal: 15,
@@ -40,16 +46,6 @@ export const DEFAULT_ISOMETRIC_CHARACTER_POSITION: IsometricCharacterPosition = 
 export const DEFAULT_ISOMETRIC_PET_POSITION: IsometricPetPosition = {
   x: isometricPetAnchor.x,
   y: isometricPetAnchor.y,
-};
-
-export const ISOMETRIC_MOVEMENT_VECTORS: Record<
-  IsometricMovementDirection,
-  IsometricMovementVector
-> = {
-  up: { dx: 0, dy: -ISOMETRIC_MOVEMENT_STEP },
-  down: { dx: 0, dy: ISOMETRIC_MOVEMENT_STEP },
-  left: { dx: -ISOMETRIC_MOVEMENT_STEP, dy: 0 },
-  right: { dx: ISOMETRIC_MOVEMENT_STEP, dy: 0 },
 };
 
 // Pink floor boundary measured in the existing 768 x 512 room artwork.

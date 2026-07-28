@@ -1,228 +1,199 @@
-import { Ionicons } from '@expo/vector-icons';
 import {
-  Pressable,
+  Animated,
+  PanResponder,
+  Platform,
   StyleSheet,
-  Text,
   View,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { useEffect, useRef } from 'react';
-import type { IsometricMovementDirection } from '../types/isometricRoom';
-
-const LONG_PRESS_DELAY_MS = 220;
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+} from 'react';
+import {
+  ISOMETRIC_JOYSTICK_BASE_SIZE,
+  ISOMETRIC_JOYSTICK_DEAD_ZONE,
+  ISOMETRIC_JOYSTICK_KNOB_SIZE,
+  ISOMETRIC_JOYSTICK_MAX_RADIUS,
+} from '../constants/isometricMovementLayout';
+import type { IsometricJoystickInput } from '../types/isometricRoom';
 
 type IsometricMovementControlsProps = {
   disabled?: boolean;
-  onMove: (direction: IsometricMovementDirection) => void;
-  onStartMove: (direction: IsometricMovementDirection) => void;
-  onStopMove: () => void;
+  onChange: (input: IsometricJoystickInput) => void;
+  onRelease: () => void;
   style?: StyleProp<ViewStyle>;
-};
-
-type DirectionButtonProps = {
-  accessibilityLabel: string;
-  direction: IsometricMovementDirection;
-  disabled: boolean;
-  icon: keyof typeof Ionicons.glyphMap;
-  onMove: (direction: IsometricMovementDirection) => void;
-  onStartMove: (direction: IsometricMovementDirection) => void;
-  onStopMove: () => void;
-  style: ViewStyle;
 };
 
 export function IsometricMovementControls({
   disabled = false,
-  onMove,
-  onStartMove,
-  onStopMove,
+  onChange,
+  onRelease,
   style,
 }: IsometricMovementControlsProps) {
+  const knobPosition = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+
+  const resetJoystick = useCallback(() => {
+    onRelease();
+    knobPosition.stopAnimation();
+    Animated.spring(knobPosition, {
+      toValue: { x: 0, y: 0 },
+      damping: 17,
+      stiffness: 230,
+      mass: 0.7,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [knobPosition, onRelease]);
+
+  const updateJoystick = useCallback((rawDx: number, rawDy: number) => {
+    const rawDistance = Math.hypot(rawDx, rawDy);
+    const clampScale = rawDistance > ISOMETRIC_JOYSTICK_MAX_RADIUS
+      ? ISOMETRIC_JOYSTICK_MAX_RADIUS / rawDistance
+      : 1;
+    const dx = rawDx * clampScale;
+    const dy = rawDy * clampScale;
+    const distance = Math.min(rawDistance, ISOMETRIC_JOYSTICK_MAX_RADIUS);
+
+    knobPosition.setValue({ x: dx, y: dy });
+
+    if (distance < ISOMETRIC_JOYSTICK_DEAD_ZONE) {
+      onChange({ x: 0, y: 0, strength: 0 });
+      return;
+    }
+
+    const strength = Math.min(
+      1,
+      (distance - ISOMETRIC_JOYSTICK_DEAD_ZONE)
+      / (ISOMETRIC_JOYSTICK_MAX_RADIUS - ISOMETRIC_JOYSTICK_DEAD_ZONE),
+    );
+    const directionLength = Math.hypot(dx, dy);
+    onChange({
+      x: directionLength > Number.EPSILON ? dx / directionLength : 0,
+      y: directionLength > Number.EPSILON ? dy / directionLength : 0,
+      strength,
+    });
+  }, [knobPosition, onChange]);
+
+  const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => !disabled,
+    onMoveShouldSetPanResponder: () => !disabled,
+    onPanResponderGrant: () => {
+      knobPosition.stopAnimation();
+      updateJoystick(0, 0);
+    },
+    onPanResponderMove: (_event, gestureState) => {
+      if (disabled) return;
+      updateJoystick(gestureState.dx, gestureState.dy);
+    },
+    onPanResponderRelease: resetJoystick,
+    onPanResponderTerminate: resetJoystick,
+    onPanResponderTerminationRequest: () => true,
+  }), [
+    disabled,
+    knobPosition,
+    resetJoystick,
+    updateJoystick,
+  ]);
+
+  useEffect(() => {
+    if (disabled) {
+      resetJoystick();
+    }
+  }, [disabled, resetJoystick]);
+
+  useEffect(() => () => {
+    knobPosition.stopAnimation();
+  }, [knobPosition]);
+
   return (
     <View
-      accessibilityLabel="캐릭터 이동 조작기"
       style={[styles.container, disabled && styles.disabled, style]}
     >
-      <DirectionButton
-        accessibilityLabel="캐릭터를 위로 이동"
-        direction="up"
-        disabled={disabled}
-        icon="chevron-up"
-        onMove={onMove}
-        onStartMove={onStartMove}
-        onStopMove={onStopMove}
-        style={styles.upButton}
-      />
-      <DirectionButton
-        accessibilityLabel="캐릭터를 왼쪽으로 이동"
-        direction="left"
-        disabled={disabled}
-        icon="chevron-back"
-        onMove={onMove}
-        onStartMove={onStartMove}
-        onStopMove={onStopMove}
-        style={styles.leftButton}
-      />
-      <View pointerEvents="none" style={styles.centerButton}>
-        <Text style={styles.centerText}>이동</Text>
+      <View
+        {...panResponder.panHandlers}
+        accessibilityLabel="캐릭터 아날로그 조이스틱"
+        accessibilityRole="adjustable"
+        accessibilityState={{ disabled }}
+        pointerEvents={disabled ? 'none' : 'auto'}
+        style={styles.base}
+        testID="isometric-joystick-base"
+      >
+        <View pointerEvents="none" style={styles.innerRing} />
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.knob,
+            {
+              transform: [
+                { translateX: knobPosition.x },
+                { translateY: knobPosition.y },
+              ],
+            },
+          ]}
+        >
+          <View style={styles.knobHighlight} />
+        </Animated.View>
       </View>
-      <DirectionButton
-        accessibilityLabel="캐릭터를 오른쪽으로 이동"
-        direction="right"
-        disabled={disabled}
-        icon="chevron-forward"
-        onMove={onMove}
-        onStartMove={onStartMove}
-        onStopMove={onStopMove}
-        style={styles.rightButton}
-      />
-      <DirectionButton
-        accessibilityLabel="캐릭터를 아래로 이동"
-        direction="down"
-        disabled={disabled}
-        icon="chevron-down"
-        onMove={onMove}
-        onStartMove={onStartMove}
-        onStopMove={onStopMove}
-        style={styles.downButton}
-      />
     </View>
   );
 }
 
-function DirectionButton({
-  accessibilityLabel,
-  direction,
-  disabled,
-  icon,
-  onMove,
-  onStartMove,
-  onStopMove,
-  style,
-}: DirectionButtonProps) {
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const didStartContinuousMoveRef = useRef(false);
-
-  const clearLongPressTimer = () => {
-    if (!longPressTimerRef.current) return;
-    clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = null;
-  };
-
-  useEffect(() => () => {
-    clearLongPressTimer();
-  }, []);
-
-  useEffect(() => {
-    if (!disabled) return;
-    clearLongPressTimer();
-    didStartContinuousMoveRef.current = false;
-    onStopMove();
-  }, [disabled, onStopMove]);
-
-  return (
-    <Pressable
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole="button"
-      disabled={disabled}
-      onPress={() => {
-        if (disabled) return;
-        if (!didStartContinuousMoveRef.current) {
-          onMove(direction);
-        }
-        didStartContinuousMoveRef.current = false;
-      }}
-      onPressIn={() => {
-        if (disabled) return;
-        clearLongPressTimer();
-        didStartContinuousMoveRef.current = false;
-        longPressTimerRef.current = setTimeout(() => {
-          longPressTimerRef.current = null;
-          didStartContinuousMoveRef.current = true;
-          onStartMove(direction);
-        }, LONG_PRESS_DELAY_MS);
-      }}
-      onPressOut={() => {
-        clearLongPressTimer();
-        onStopMove();
-      }}
-      style={({ pressed }) => [
-        styles.directionButton,
-        style,
-        pressed && styles.directionButtonPressed,
-      ]}
-    >
-      <Ionicons color="#6E5A49" name={icon} size={27} />
-    </Pressable>
-  );
-}
-
-const BUTTON_SIZE = 50;
-
 const styles = StyleSheet.create({
   container: {
-    width: 164,
-    height: 158,
-    alignSelf: 'center',
-    borderRadius: 52,
-    borderWidth: 1,
-    borderColor: 'rgba(149, 126, 101, 0.18)',
-    backgroundColor: 'rgba(255, 251, 242, 0.92)',
-    shadowColor: '#5D4939',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.13,
-    shadowRadius: 12,
-    elevation: 5,
+    width: ISOMETRIC_JOYSTICK_BASE_SIZE + 12,
+    height: ISOMETRIC_JOYSTICK_BASE_SIZE + 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   disabled: {
-    opacity: 0.46,
+    opacity: 0.42,
   },
-  directionButton: {
-    position: 'absolute',
-    width: BUTTON_SIZE,
-    height: BUTTON_SIZE,
-    borderRadius: BUTTON_SIZE / 2,
+  base: {
+    width: ISOMETRIC_JOYSTICK_BASE_SIZE,
+    height: ISOMETRIC_JOYSTICK_BASE_SIZE,
+    borderRadius: ISOMETRIC_JOYSTICK_BASE_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(135, 109, 83, 0.18)',
-    backgroundColor: '#F2E7D6',
+    borderColor: 'rgba(132, 111, 87, 0.22)',
+    backgroundColor: 'rgba(249, 241, 228, 0.96)',
+    shadowColor: '#5D4939',
+    shadowOffset: { width: 0, height: 7 },
+    shadowOpacity: 0.16,
+    shadowRadius: 13,
+    elevation: 6,
   },
-  directionButtonPressed: {
-    opacity: 0.78,
-    transform: [{ scale: 0.92 }],
-    backgroundColor: '#E7D6BF',
-  },
-  upButton: {
-    left: 57,
-    top: 2,
-  },
-  leftButton: {
-    left: 3,
-    top: 54,
-  },
-  rightButton: {
-    right: 3,
-    top: 54,
-  },
-  downButton: {
-    left: 57,
-    bottom: 2,
-  },
-  centerButton: {
+  innerRing: {
     position: 'absolute',
-    left: 57,
-    top: 54,
-    width: BUTTON_SIZE,
-    height: BUTTON_SIZE,
-    borderRadius: BUTTON_SIZE / 2,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    borderWidth: 1,
+    borderColor: 'rgba(138, 116, 91, 0.13)',
+    backgroundColor: 'rgba(228, 215, 197, 0.3)',
+  },
+  knob: {
+    width: ISOMETRIC_JOYSTICK_KNOB_SIZE,
+    height: ISOMETRIC_JOYSTICK_KNOB_SIZE,
+    borderRadius: ISOMETRIC_JOYSTICK_KNOB_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#7D8D62',
+    borderWidth: 1,
+    borderColor: 'rgba(100, 82, 64, 0.22)',
+    backgroundColor: '#8A7764',
+    shadowColor: '#4C3C30',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.24,
+    shadowRadius: 7,
+    elevation: 5,
   },
-  centerText: {
-    color: '#FFF9EF',
-    fontSize: 11,
-    fontWeight: '900',
+  knobHighlight: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255, 248, 235, 0.22)',
   },
 });

@@ -20,7 +20,6 @@ export type IsometricStudyShelfRowId = 'bottom' | 'top';
 
 export type IsometricCleaningMessType = 'paper' | 'dust' | 'cloth' | 'wrapper';
 export type IsometricFreshnessEffectType = 'sparkle' | 'dot' | 'droplet';
-export type IsometricMovementDirection = 'up' | 'down' | 'left' | 'right';
 export type IsometricCharacterFacingDirection = 'left' | 'right';
 
 export interface IsometricCharacterPosition {
@@ -36,6 +35,12 @@ export interface IsometricPetPosition {
 export interface IsometricMovementVector {
   dx: number;
   dy: number;
+}
+
+export interface IsometricJoystickInput {
+  x: number;
+  y: number;
+  strength: number;
 }
 
 export interface IsometricPoint {

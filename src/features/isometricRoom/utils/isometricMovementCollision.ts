@@ -7,7 +7,7 @@ import {
 } from '../constants/isometricMovementLayout';
 import type {
   IsometricCharacterPosition,
-  IsometricMovementDirection,
+  IsometricMovementVector,
   IsometricObstacle,
   IsometricPetPosition,
   IsometricPoint,
@@ -24,44 +24,6 @@ type CollisionRadius = {
 type EscapeVector = {
   dx: number;
   dy: number;
-};
-
-const PET_ESCAPE_VECTORS: Record<
-  IsometricMovementDirection,
-  EscapeVector[]
-> = {
-  up: [
-    { dx: 0, dy: -1 },
-    { dx: -0.72, dy: -1 },
-    { dx: 0.72, dy: -1 },
-    { dx: -1, dy: 0 },
-    { dx: 1, dy: 0 },
-    { dx: 0, dy: 1 },
-  ],
-  down: [
-    { dx: 0, dy: 1 },
-    { dx: -0.72, dy: 1 },
-    { dx: 0.72, dy: 1 },
-    { dx: -1, dy: 0 },
-    { dx: 1, dy: 0 },
-    { dx: 0, dy: -1 },
-  ],
-  left: [
-    { dx: -1, dy: 0 },
-    { dx: -1, dy: -0.72 },
-    { dx: -1, dy: 0.72 },
-    { dx: 0, dy: -1 },
-    { dx: 0, dy: 1 },
-    { dx: 1, dy: 0 },
-  ],
-  right: [
-    { dx: 1, dy: 0 },
-    { dx: 1, dy: -0.72 },
-    { dx: 1, dy: 0.72 },
-    { dx: 0, dy: -1 },
-    { dx: 0, dy: 1 },
-    { dx: -1, dy: 0 },
-  ],
 };
 
 export function isPointInsidePolygon(
@@ -242,13 +204,28 @@ export function isIsometricPetPositionValid(
 export function findPetEscapePosition(
   petPosition: IsometricPetPosition,
   targetCharacterPosition: IsometricCharacterPosition,
-  characterDirection: IsometricMovementDirection,
+  characterVelocity: IsometricMovementVector,
 ) {
   if (!isCharacterTooCloseToPet(targetCharacterPosition, petPosition)) {
     return petPosition;
   }
 
-  const vectors = PET_ESCAPE_VECTORS[characterDirection];
+  const velocityLength = Math.hypot(
+    characterVelocity.dx,
+    characterVelocity.dy,
+  );
+  const forward = velocityLength > Number.EPSILON
+    ? {
+      dx: characterVelocity.dx / velocityLength,
+      dy: characterVelocity.dy / velocityLength,
+    }
+    : { dx: 1, dy: 0 };
+  const vectors: EscapeVector[] = [
+    forward,
+    { dx: -forward.dy, dy: forward.dx },
+    { dx: forward.dy, dy: -forward.dx },
+    { dx: -forward.dx, dy: -forward.dy },
+  ];
 
   for (const step of PET_ESCAPE_STEPS) {
     for (const vector of vectors) {
@@ -266,6 +243,42 @@ export function findPetEscapePosition(
   return null;
 }
 
+export function resolveIsometricCharacterMovement(
+  currentPosition: IsometricCharacterPosition,
+  movement: IsometricMovementVector,
+) {
+  const requestedPosition = {
+    x: currentPosition.x + movement.dx,
+    y: currentPosition.y + movement.dy,
+  };
+
+  if (isIsometricCharacterPositionValid(requestedPosition)) {
+    return requestedPosition;
+  }
+
+  if (movement.dx !== 0) {
+    const xOnlyPosition = {
+      x: currentPosition.x + movement.dx,
+      y: currentPosition.y,
+    };
+    if (isIsometricCharacterPositionValid(xOnlyPosition)) {
+      return xOnlyPosition;
+    }
+  }
+
+  if (movement.dy !== 0) {
+    const yOnlyPosition = {
+      x: currentPosition.x,
+      y: currentPosition.y + movement.dy,
+    };
+    if (isIsometricCharacterPositionValid(yOnlyPosition)) {
+      return yOnlyPosition;
+    }
+  }
+
+  return currentPosition;
+}
+
 export function isTapPointOnWalkableFloor(point: IsometricPoint) {
   if (!isPointInsidePolygon(point, ISOMETRIC_WALKABLE_POLYGON)) {
     return false;
@@ -274,13 +287,4 @@ export function isTapPointOnWalkableFloor(point: IsometricPoint) {
   return !ISOMETRIC_FIXED_MOVEMENT_OBSTACLES.some(
     (obstacle) => isPointInsidePolygon(point, obstacle.polygon),
   );
-}
-
-export function getValidCharacterPosition(
-  currentPosition: IsometricCharacterPosition,
-  nextPosition: IsometricCharacterPosition,
-) {
-  return isIsometricCharacterPositionValid(nextPosition)
-    ? nextPosition
-    : currentPosition;
 }

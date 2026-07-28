@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import { getMvpCharacterCatalogItem } from '@/features/customization/catalogs/characterCatalog';
 import type { MvpCharacterId } from '@/features/customization/types/customization';
-import { ISOMETRIC_STEP_ANIMATION_MS } from '../constants/isometricMovementLayout';
 import {
   isometricCharacterAnchor,
   isometricCharacterLayout,
@@ -33,22 +32,10 @@ export function IsometricCharacterLayer({
   position,
 }: IsometricCharacterLayerProps) {
   const character = getMvpCharacterCatalogItem(characterId);
-  const movement = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const walkingBob = useRef(new Animated.Value(0)).current;
   const targetPosition = position ?? isometricCharacterAnchor;
   const translateX = targetPosition.x - isometricCharacterAnchor.x;
   const translateY = targetPosition.y - isometricCharacterAnchor.y;
-
-  useEffect(() => {
-    const animation = Animated.timing(movement, {
-      toValue: { x: translateX, y: translateY },
-      duration: ISOMETRIC_STEP_ANIMATION_MS,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: Platform.OS !== 'web',
-    });
-    animation.start();
-    return () => animation.stop();
-  }, [movement, translateX, translateY]);
 
   useEffect(() => {
     if (!isMoving) {
@@ -94,8 +81,8 @@ export function IsometricCharacterLayer({
           height: isometricCharacterLayout.height,
           zIndex: isometricCharacterLayout.zIndex,
           transform: [
-            { translateX: movement.x },
-            { translateY: movement.y },
+            { translateX },
+            { translateY },
             { translateY: walkingBob },
           ],
         },

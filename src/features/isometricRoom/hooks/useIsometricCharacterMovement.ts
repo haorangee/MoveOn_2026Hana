@@ -10,26 +10,37 @@ import {
   DEFAULT_ISOMETRIC_PET_POSITION,
   ISOMETRIC_CHARACTER_POSITION_STORAGE_KEY,
   ISOMETRIC_CHARACTER_POSITION_STORAGE_VERSION,
-  ISOMETRIC_CONTINUOUS_MOVE_INTERVAL_MS,
-  ISOMETRIC_MOVEMENT_VECTORS,
+  ISOMETRIC_COLLISION_SUBSTEP_SIZE,
+  ISOMETRIC_FACING_HORIZONTAL_THRESHOLD,
+  ISOMETRIC_MAX_FRAME_DELTA_SECONDS,
+  ISOMETRIC_MAX_MOVEMENT_SPEED,
+  ISOMETRIC_MIN_MOVEMENT_SPEED,
   ISOMETRIC_POSITION_SAVE_DEBOUNCE_MS,
-  ISOMETRIC_STEP_ANIMATION_MS,
+  ISOMETRIC_TAP_MOVE_ANIMATION_MS,
+  ISOMETRIC_TAP_MOVE_DISTANCE,
 } from '../constants/isometricMovementLayout';
 import type {
   IsometricCharacterFacingDirection,
   IsometricCharacterPosition,
-  IsometricMovementDirection,
+  IsometricJoystickInput,
+  IsometricMovementVector,
   IsometricPetPosition,
 } from '../types/isometricRoom';
 import {
   findPetEscapePosition,
-  getValidCharacterPosition,
   isIsometricCharacterPositionValid,
   isTapPointOnWalkableFloor,
+  resolveIsometricCharacterMovement,
 } from '../utils/isometricMovementCollision';
 
 type StoredIsometricCharacterPosition = IsometricCharacterPosition & {
   version: typeof ISOMETRIC_CHARACTER_POSITION_STORAGE_VERSION;
+};
+
+const IDLE_JOYSTICK_INPUT: IsometricJoystickInput = {
+  x: 0,
+  y: 0,
+  strength: 0,
 };
 
 function parseStoredPosition(value: string | null) {
@@ -80,10 +91,11 @@ export function useIsometricCharacterMovement() {
   const [isMoving, setIsMoving] = useState(false);
   const positionRef = useRef(position);
   const petPositionRef = useRef(petPosition);
+  const movementInputRef = useRef<IsometricJoystickInput>(IDLE_JOYSTICK_INPUT);
+  const animationFrameRef = useRef<number | null>(null);
+  const lastFrameTimeRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
   const hydratedRef = useRef(false);
-  const continuousMoveTimerRef =
-    useRef<ReturnType<typeof setInterval> | null>(null);
   const movementStopTimerRef =
     useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -94,10 +106,20 @@ export function useIsometricCharacterMovement() {
     movementStopTimerRef.current = null;
   }, []);
 
+  const updateFacingDirection = useCallback((horizontalVelocity: number) => {
+    if (horizontalVelocity < -ISOMETRIC_FACING_HORIZONTAL_THRESHOLD) {
+      setFacingDirection('left');
+    } else if (horizontalVelocity > ISOMETRIC_FACING_HORIZONTAL_THRESHOLD) {
+      setFacingDirection('right');
+    }
+  }, []);
+
   const stopMoving = useCallback(() => {
-    if (continuousMoveTimerRef.current) {
-      clearInterval(continuousMoveTimerRef.current);
-      continuousMoveTimerRef.current = null;
+    movementInputRef.current = IDLE_JOYSTICK_INPUT;
+    lastFrameTimeRef.current = null;
+    if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
     }
     clearMovementStopTimer();
     if (mountedRef.current) {
@@ -105,70 +127,161 @@ export function useIsometricCharacterMovement() {
     }
   }, [clearMovementStopTimer]);
 
-  const applyMovementStep = useCallback((
-    direction: IsometricMovementDirection,
+  const applyMovementDelta = useCallback((
+    movement: IsometricMovementVector,
     keepMoving: boolean,
   ) => {
-    if (direction === 'left' || direction === 'right') {
-      setFacingDirection(direction);
+    const totalDistance = Math.hypot(movement.dx, movement.dy);
+    if (totalDistance <= Number.EPSILON) {
+      if (mountedRef.current) {
+        setIsMoving(false);
+      }
+      return false;
     }
 
-    const vector = ISOMETRIC_MOVEMENT_VECTORS[direction];
-    const currentPosition = positionRef.current;
-    const requestedPosition = {
-      x: currentPosition.x + vector.dx,
-      y: currentPosition.y + vector.dy,
+    updateFacingDirection(movement.dx / totalDistance);
+
+    const substepCount = Math.max(
+      1,
+      Math.ceil(totalDistance / ISOMETRIC_COLLISION_SUBSTEP_SIZE),
+    );
+    const substep = {
+      dx: movement.dx / substepCount,
+      dy: movement.dy / substepCount,
     };
-    const validPosition = getValidCharacterPosition(
-      currentPosition,
-      requestedPosition,
-    );
-    const didMove = (
-      validPosition.x !== currentPosition.x
-      || validPosition.y !== currentPosition.y
-    );
+    let nextCharacterPosition = positionRef.current;
+    let nextPetPosition = petPositionRef.current;
+    let didMove = false;
 
-    if (!didMove) {
-      if (mountedRef.current) {
-        setIsMoving(false);
+    for (let index = 0; index < substepCount; index += 1) {
+      const candidateCharacterPosition = resolveIsometricCharacterMovement(
+        nextCharacterPosition,
+        substep,
+      );
+      const actualMovement = {
+        dx: candidateCharacterPosition.x - nextCharacterPosition.x,
+        dy: candidateCharacterPosition.y - nextCharacterPosition.y,
+      };
+
+      if (
+        Math.abs(actualMovement.dx) <= Number.EPSILON
+        && Math.abs(actualMovement.dy) <= Number.EPSILON
+      ) {
+        continue;
       }
-      return false;
-    }
 
-    const escapedPetPosition = findPetEscapePosition(
-      petPositionRef.current,
-      validPosition,
-      direction,
-    );
-
-    if (!escapedPetPosition) {
-      if (mountedRef.current) {
-        setIsMoving(false);
+      const escapedPetPosition = findPetEscapePosition(
+        nextPetPosition,
+        candidateCharacterPosition,
+        actualMovement,
+      );
+      if (!escapedPetPosition) {
+        continue;
       }
-      return false;
+
+      nextCharacterPosition = candidateCharacterPosition;
+      nextPetPosition = escapedPetPosition;
+      didMove = true;
     }
 
-    if (
-      escapedPetPosition.x !== petPositionRef.current.x
-      || escapedPetPosition.y !== petPositionRef.current.y
-    ) {
-      petPositionRef.current = escapedPetPosition;
-      setPetPosition(escapedPetPosition);
-    }
+    if (didMove && mountedRef.current) {
+      if (
+        nextPetPosition.x !== petPositionRef.current.x
+        || nextPetPosition.y !== petPositionRef.current.y
+      ) {
+        petPositionRef.current = nextPetPosition;
+        setPetPosition(nextPetPosition);
+      }
 
-    positionRef.current = validPosition;
-    setPosition(validPosition);
+      positionRef.current = nextCharacterPosition;
+      setPosition(nextCharacterPosition);
+    }
 
     if (mountedRef.current) {
-      setIsMoving(keepMoving);
+      setIsMoving(didMove && keepMoving);
     }
 
-    return true;
-  }, []);
+    return didMove;
+  }, [updateFacingDirection]);
 
-  const moveOneStep = useCallback((direction: IsometricMovementDirection) => {
+  const runMovementFrame = useCallback(function movementFrame(
+    timestamp: number,
+  ) {
+    const input = movementInputRef.current;
+    if (input.strength <= 0 || !mountedRef.current) {
+      animationFrameRef.current = null;
+      lastFrameTimeRef.current = null;
+      return;
+    }
+
+    const previousTimestamp = lastFrameTimeRef.current;
+    lastFrameTimeRef.current = timestamp;
+
+    if (previousTimestamp !== null) {
+      const deltaSeconds = Math.min(
+        ISOMETRIC_MAX_FRAME_DELTA_SECONDS,
+        Math.max(0, (timestamp - previousTimestamp) / 1000),
+      );
+      const speed = ISOMETRIC_MIN_MOVEMENT_SPEED + (
+        input.strength
+        * (ISOMETRIC_MAX_MOVEMENT_SPEED - ISOMETRIC_MIN_MOVEMENT_SPEED)
+      );
+
+      applyMovementDelta({
+        dx: input.x * speed * deltaSeconds,
+        dy: input.y * speed * deltaSeconds,
+      }, true);
+    }
+
+    animationFrameRef.current = requestAnimationFrame(movementFrame);
+  }, [applyMovementDelta]);
+
+  const setJoystickInput = useCallback((input: IsometricJoystickInput) => {
+    clearMovementStopTimer();
+    const strength = Math.min(1, Math.max(0, input.strength));
+    const vectorLength = Math.hypot(input.x, input.y);
+
+    if (strength <= 0 || vectorLength <= Number.EPSILON) {
+      stopMoving();
+      return;
+    }
+
+    movementInputRef.current = {
+      x: input.x / vectorLength,
+      y: input.y / vectorLength,
+      strength,
+    };
+    updateFacingDirection(movementInputRef.current.x);
+
+    if (animationFrameRef.current === null) {
+      lastFrameTimeRef.current = null;
+      setIsMoving(true);
+      animationFrameRef.current = requestAnimationFrame(runMovementFrame);
+    }
+  }, [
+    clearMovementStopTimer,
+    runMovementFrame,
+    stopMoving,
+    updateFacingDirection,
+  ]);
+
+  const moveTowardPoint = useCallback((target: IsometricCharacterPosition) => {
+    if (!isTapPointOnWalkableFloor(target)) return;
+
     stopMoving();
-    const didMove = applyMovementStep(direction, true);
+    const currentPosition = positionRef.current;
+    const deltaX = target.x - currentPosition.x;
+    const deltaY = target.y - currentPosition.y;
+    const distance = Math.hypot(deltaX, deltaY);
+
+    if (distance <= ISOMETRIC_COLLISION_SUBSTEP_SIZE) {
+      return;
+    }
+
+    const didMove = applyMovementDelta({
+      dx: (deltaX / distance) * ISOMETRIC_TAP_MOVE_DISTANCE,
+      dy: (deltaY / distance) * ISOMETRIC_TAP_MOVE_DISTANCE,
+    }, true);
     if (!didMove) return;
 
     movementStopTimerRef.current = setTimeout(() => {
@@ -176,35 +289,8 @@ export function useIsometricCharacterMovement() {
       if (mountedRef.current) {
         setIsMoving(false);
       }
-    }, ISOMETRIC_STEP_ANIMATION_MS + 30);
-  }, [applyMovementStep, stopMoving]);
-
-  const startMoving = useCallback((direction: IsometricMovementDirection) => {
-    stopMoving();
-    applyMovementStep(direction, true);
-
-    continuousMoveTimerRef.current = setInterval(() => {
-      applyMovementStep(direction, true);
-    }, ISOMETRIC_CONTINUOUS_MOVE_INTERVAL_MS);
-  }, [applyMovementStep, stopMoving]);
-
-  const moveTowardPoint = useCallback((target: IsometricCharacterPosition) => {
-    if (!isTapPointOnWalkableFloor(target)) return;
-
-    const currentPosition = positionRef.current;
-    const deltaX = target.x - currentPosition.x;
-    const deltaY = target.y - currentPosition.y;
-
-    if (Math.abs(deltaX) <= 18 && Math.abs(deltaY) <= 12) {
-      return;
-    }
-
-    const direction: IsometricMovementDirection = Math.abs(deltaX) > Math.abs(deltaY)
-      ? (deltaX > 0 ? 'right' : 'left')
-      : (deltaY > 0 ? 'down' : 'up');
-
-    moveOneStep(direction);
-  }, [moveOneStep]);
+    }, ISOMETRIC_TAP_MOVE_ANIMATION_MS);
+  }, [applyMovementDelta, stopMoving]);
 
   const resetPosition = useCallback(() => {
     stopMoving();
@@ -231,7 +317,7 @@ export function useIsometricCharacterMovement() {
         const restoredPetPosition = findPetEscapePosition(
           petPositionRef.current,
           savedPosition,
-          'right',
+          { dx: 1, dy: 0 },
         );
         if (!restoredPetPosition) return;
 
@@ -283,9 +369,10 @@ export function useIsometricCharacterMovement() {
 
   useEffect(() => () => {
     mountedRef.current = false;
-    if (continuousMoveTimerRef.current) {
-      clearInterval(continuousMoveTimerRef.current);
-      continuousMoveTimerRef.current = null;
+    movementInputRef.current = IDLE_JOYSTICK_INPUT;
+    if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
     }
     if (movementStopTimerRef.current) {
       clearTimeout(movementStopTimerRef.current);
@@ -309,8 +396,7 @@ export function useIsometricCharacterMovement() {
     petPosition,
     facingDirection,
     isMoving,
-    moveOneStep,
-    startMoving,
+    setJoystickInput,
     stopMoving,
     moveTowardPoint,
     resetPosition,

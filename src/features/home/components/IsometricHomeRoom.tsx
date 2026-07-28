@@ -170,9 +170,8 @@ export function IsometricHomeRoom() {
         <View style={styles.movementControls}>
           <IsometricMovementControls
             disabled={waterModalVisible}
-            onMove={movement.moveOneStep}
-            onStartMove={movement.startMoving}
-            onStopMove={movement.stopMoving}
+            onChange={movement.setJoystickInput}
+            onRelease={movement.stopMoving}
           />
         </View>
       </View>

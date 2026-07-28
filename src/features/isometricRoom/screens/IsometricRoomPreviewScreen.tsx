@@ -321,9 +321,8 @@ export default function IsometricRoomPreviewScreen() {
       <View style={styles.movementControls}>
         <IsometricMovementControls
           disabled={waterStatusVisible}
-          onMove={movement.moveOneStep}
-          onStartMove={movement.startMoving}
-          onStopMove={movement.stopMoving}
+          onChange={movement.setJoystickInput}
+          onRelease={movement.stopMoving}
         />
       </View>
 
