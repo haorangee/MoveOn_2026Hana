@@ -8,7 +8,7 @@ export function useActivityRewardModal() {
   const [rewardCategoryId, setRewardCategoryId] = useState<ActivityCategory | null>(null);
 
   const showRewardResult = useCallback((
-    categoryId: ActivityCategory,
+    categoryId: ActivityCategory | null,
     result: ProcessActivityRewardResult | null,
   ) => {
     setRewardCategoryId(categoryId);
