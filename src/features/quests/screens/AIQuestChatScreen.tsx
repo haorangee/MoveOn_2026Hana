@@ -227,10 +227,10 @@ export default function AIQuestChatScreen() {
           router.replace('/' as Href);
           return;
         case 'simple':
-          router.push({ pathname: '/quest-simple', params: { questId: createdQuest.id } });
+          router.push({ pathname: '/quest-simple', params: { questId: createdQuest.id } } as unknown as Href);
           return;
         case 'my_time':
-          router.push({ pathname: '/my-time', params: { questId: createdQuest.id } });
+          router.push({ pathname: '/my-time', params: { questId: createdQuest.id } } as unknown as Href);
           return;
         default:
           throw new Error('아직 시작할 수 없는 퀘스트예요.');
