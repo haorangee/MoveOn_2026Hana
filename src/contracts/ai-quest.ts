@@ -18,6 +18,19 @@ export type AIQuestLevel =
   | 'easy'
   | 'action';
 
+export type AIQuestRequestMode =
+  | 'first'
+  | 'next';
+
+export type GenerateAIQuestsRequest = {
+  message: string;
+  mode: AIQuestRequestMode;
+  originalMessage?: string;
+  previousQuests?: string[];
+  completedQuests?: string[];
+  categoryHint?: AIQuestCategory;
+};
+
 export type AIQuestOption = {
   id: string;
   title: string;
