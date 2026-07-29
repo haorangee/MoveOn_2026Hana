@@ -12,6 +12,7 @@ import type {
   QuestDraft,
   QuestSource,
 } from '../../../contracts/quest';
+import type { AIQuestExecutionType, AIQuestLevel } from '../../../contracts/ai-quest';
 import type {
   CompleteQuestInput,
   CreateQuestInput,
@@ -54,6 +55,8 @@ const MIN_ESTIMATED_MINUTES = 1;
 const MAX_ESTIMATED_MINUTES = 1440;
 const QUEST_DIFFICULTIES: QuestDifficulty[] = ['easy', 'normal', 'hard'];
 const QUEST_SOURCES: QuestSource[] = ['system', 'user', 'ai', 'fallback'];
+const AI_QUEST_EXECUTION_TYPES: AIQuestExecutionType[] = ['simple', 'study', 'cleaning', 'shower', 'water', 'my_time'];
+const AI_QUEST_LEVELS: AIQuestLevel[] = ['very_easy', 'easy', 'action'];
 
 function throwQuestError(code: QuestErrorCode, message: string): never {
   throw new QuestError(code, message);
@@ -148,6 +151,24 @@ function normalizeSource(value: unknown) {
   return value as QuestSource;
 }
 
+function normalizeExecutionType(value: unknown) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (!AI_QUEST_EXECUTION_TYPES.includes(value as AIQuestExecutionType)) {
+    throwQuestError('QUEST_INVALID_INPUT', '지원하지 않는 AI 실행 타입이에요.');
+  }
+  return value as AIQuestExecutionType;
+}
+
+function normalizeAIQuestLevel(value: unknown) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (!AI_QUEST_LEVELS.includes(value as AIQuestLevel)) {
+    throwQuestError('QUEST_INVALID_INPUT', '지원하지 않는 AI 퀘스트 레벨이에요.');
+  }
+  return value as AIQuestLevel;
+}
+
 function normalizeRewardCategory(
   value: unknown,
 ) {
@@ -239,6 +260,8 @@ function normalizeCreateQuestInput(input: CreateQuestInput): CreateQuestInput {
     difficulty: normalizeDifficulty(input.difficulty),
     source: normalizeSource(input.source),
     scheduledDate: normalizeDateKey(input.scheduledDate),
+    executionType: normalizeExecutionType(input.executionType) ?? undefined,
+    aiQuestLevel: normalizeAIQuestLevel(input.aiQuestLevel) ?? undefined,
     recommendationReason: normalizeOptionalTextForCreate(
       input.recommendationReason,
       '추천 이유',
@@ -278,6 +301,13 @@ function normalizeUpdateQuestInput(
       '추천 이유',
       RECOMMENDATION_REASON_MAX_LENGTH,
     );
+  }
+
+  if (input.executionType !== undefined) {
+    normalized.executionType = normalizeExecutionType(input.executionType);
+  }
+  if (input.aiQuestLevel !== undefined) {
+    normalized.aiQuestLevel = normalizeAIQuestLevel(input.aiQuestLevel);
   }
 
   const nextCategory = input.category === undefined

@@ -33,6 +33,24 @@ export async function createActivityRecord(record: ActivityRecord) {
   });
 }
 
+export async function createActivityRecordIfMissing(record: ActivityRecord) {
+  const reference = activityRecordRef(record.userId, record.activityId);
+  return runTransaction(firestore, async (transaction) => {
+    const snapshot = await transaction.get(reference);
+    if (snapshot.exists()) {
+      return snapshot.data() as ActivityRecord;
+    }
+
+    const nextRecord = {
+      ...record,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    transaction.set(reference, nextRecord);
+    return record;
+  });
+}
+
 export async function updateActivityRecord(
   userId: string,
   activityId: string,

@@ -6,7 +6,7 @@ import { theme } from '@/shared/theme';
 
 interface ActivityRewardModalProps {
   visible: boolean;
-  categoryId: ActivityCategory;
+  categoryId: ActivityCategory | null;
   result: ProcessActivityRewardResult | null;
   onConfirm: () => void;
 }
@@ -18,21 +18,27 @@ const CATEGORY_LABEL: Record<ActivityCategory, string> = {
   [ACTIVITY_CATEGORY.WATER]: '물 마시기 완료!',
 };
 
-export function ActivityRewardModal({ visible, categoryId, result, onConfirm }: ActivityRewardModalProps) {
+export function ActivityRewardModal({
+  visible,
+  categoryId,
+  result,
+  onConfirm,
+}: ActivityRewardModalProps) {
   const earnedXp = result?.rewardApplied ? result.earnedXp : 0;
   const earnedGrapes = result?.rewardApplied ? result.earnedGrapes : 0;
   const totalLevel = result?.newTotalLevel ?? 1;
   const categoryLevel = result?.newCategoryLevel ?? 1;
   const totalLevelUp = result?.totalLevelChange.didLevelUp ?? false;
-  const categoryLevelUp = result?.categoryLevelChange.didLevelUp ?? false;
-
+  const categoryLevelUp = result?.categoryLevelChange?.didLevelUp ?? false;
   const hasNothingRewarded = earnedXp === 0 && earnedGrapes === 0;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onConfirm}>
       <Pressable style={styles.backdrop} onPress={onConfirm}>
         <Pressable style={styles.card} onPress={() => null}>
-          <Text style={styles.title}>{CATEGORY_LABEL[categoryId]}</Text>
+          <Text style={styles.title}>
+            {categoryId ? CATEGORY_LABEL[categoryId] : '퀘스트 완료!'}
+          </Text>
 
           {hasNothingRewarded ? (
             <Text style={styles.message}>오늘은 받을 수 있는 보상이 없어요.</Text>
@@ -45,18 +51,28 @@ export function ActivityRewardModal({ visible, categoryId, result, onConfirm }: 
 
           <View style={styles.levelBox}>
             <Text style={styles.levelText}>
-              {totalLevelUp ? `전체 레벨 Lv.${result?.totalLevelChange.previousLevel ?? 1} → Lv.${totalLevel}` : `전체 레벨 Lv.${totalLevel}`}
+              {totalLevelUp
+                ? `전체 레벨 Lv.${result?.totalLevelChange.previousLevel ?? 1} → Lv.${totalLevel}`
+                : `전체 레벨 Lv.${totalLevel}`}
             </Text>
-            <Text style={styles.levelText}>
-              {categoryLevelUp
-                ? `카테고리 레벨 Lv.${result?.categoryLevelChange.previousLevel ?? 1} → Lv.${categoryLevel}`
-                : `카테고리 레벨 Lv.${categoryLevel}`}
-            </Text>
+            {categoryId ? (
+              <Text style={styles.levelText}>
+                {categoryLevelUp
+                  ? `카테고리 레벨 Lv.${result?.categoryLevelChange?.previousLevel ?? 1} → Lv.${categoryLevel}`
+                  : `카테고리 레벨 Lv.${categoryLevel}`}
+              </Text>
+            ) : null}
           </View>
 
-          {result?.alreadyProcessed ? <Text style={styles.notice}>이미 처리된 보상이라 다시 지급하지 않았어요.</Text> : null}
+          {result?.alreadyProcessed ? (
+            <Text style={styles.notice}>이미 처리된 보상이라 다시 지급하지 않았어요.</Text>
+          ) : null}
 
-          <Pressable accessibilityRole="button" onPress={onConfirm} style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onConfirm}
+            style={({ pressed }) => [styles.button, pressed && styles.pressed]}
+          >
             <Text style={styles.buttonText}>확인</Text>
           </Pressable>
         </Pressable>
@@ -133,4 +149,3 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.99 }],
   },
 });
-

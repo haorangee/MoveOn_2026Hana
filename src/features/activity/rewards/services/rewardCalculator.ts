@@ -3,7 +3,8 @@ import { ACTIVITY_STATUS } from '@/features/activity/constants/activityStatus';
 import { REWARD_POLICY } from '@/features/activity/rewards/constants/rewardPolicy';
 import { REWARD_REASON, type RewardReason } from '@/features/activity/rewards/constants/rewardReason';
 import type { DailyRewardContext, ActivityRewardResult, RewardBreakdown } from '@/features/activity/rewards/types/reward';
-import type { ActivityRecord } from '@/features/activity/types/activity';
+import type { ActivityRecord, QuestActivityDetails } from '@/features/activity/types/activity';
+import type { ActivityCategory } from '@/features/activity/constants/activityCategory';
 
 function zeroBreakdown(): RewardBreakdown {
   return {
@@ -22,10 +23,15 @@ function finishResult(
   earnedGrapes: number,
   reason: RewardReason,
   breakdown: RewardBreakdown,
+  categoryId: ActivityCategory | null = activity.rewardCategory ?? (
+    Object.values(ACTIVITY_CATEGORY).includes(activity.categoryId as ActivityCategory)
+      ? activity.categoryId as ActivityCategory
+      : null
+  ),
 ): ActivityRewardResult {
   return {
     activityId: activity.activityId,
-    categoryId: activity.categoryId,
+    categoryId,
     earnedXp: Math.max(0, Math.floor(earnedXp)),
     earnedGrapes: Math.max(0, Math.floor(earnedGrapes)),
     isRewardEligible: reason === REWARD_REASON.ELIGIBLE,
@@ -39,6 +45,63 @@ function finishResult(
       rewardedUnits: Math.max(0, Math.floor(breakdown.rewardedUnits)),
     },
   };
+}
+
+function isQuestActivityDetails(value: ActivityRecord['details']): value is QuestActivityDetails {
+  return (value as { type?: unknown }).type === 'quest';
+}
+
+function calculateSimpleQuestReward(details: QuestActivityDetails) {
+  switch (details.aiQuestLevel) {
+    case 'very_easy':
+      return 2;
+    case 'easy':
+      return 4;
+    case 'action':
+      return 6;
+    default:
+      return null;
+  }
+}
+
+function calculateMyTimeQuestReward(details: QuestActivityDetails) {
+  switch (details.durationMinutes) {
+    case 5:
+      return 3;
+    case 10:
+      return 5;
+    case 15:
+      return 7;
+    default:
+      return null;
+  }
+}
+
+export function calculateQuestReward(activity: ActivityRecord): ActivityRewardResult {
+  if (activity.status !== ACTIVITY_STATUS.COMPLETED) {
+    return finishResult(activity, 0, 0, REWARD_REASON.ACTIVITY_NOT_COMPLETED, zeroBreakdown());
+  }
+
+  if (!isQuestActivityDetails(activity.details)) {
+    return finishResult(activity, 0, 0, REWARD_REASON.INVALID_ACTIVITY, zeroBreakdown());
+  }
+
+  const earnedXp = activity.details.executionType === 'simple'
+    ? calculateSimpleQuestReward(activity.details)
+    : calculateMyTimeQuestReward(activity.details);
+
+  if (earnedXp === null) {
+    return finishResult(activity, 0, 0, REWARD_REASON.INVALID_ACTIVITY, zeroBreakdown());
+  }
+
+  return finishResult(activity, earnedXp, 1, REWARD_REASON.ELIGIBLE, {
+    baseXp: earnedXp,
+    bonusXp: 0,
+    baseGrapes: 1,
+    bonusGrapes: 0,
+    rewardedUnits: 1,
+    dailyLimitApplied: false,
+  });
 }
 
 function readMinutes(activity: ActivityRecord) {
@@ -190,6 +253,10 @@ export function calculateActivityReward(
   activity: ActivityRecord,
   context: DailyRewardContext,
 ): ActivityRewardResult {
+  if (isQuestActivityDetails(activity.details)) {
+    return calculateQuestReward(activity);
+  }
+
   switch (activity.categoryId) {
     case ACTIVITY_CATEGORY.STUDY:
       return calculateStudyReward(activity, context);

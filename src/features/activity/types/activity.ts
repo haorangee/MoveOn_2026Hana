@@ -1,6 +1,9 @@
 import type { Timestamp } from 'firebase/firestore';
+import type { AIQuestExecutionType, AIQuestLevel } from '@/contracts/ai-quest';
 import type { ActivityCategory } from '@/features/activity/constants/activityCategory';
 import type { ActivityStatus } from '@/features/activity/constants/activityStatus';
+
+export type ActivityRecordCategory = ActivityCategory | 'custom';
 
 export type StudyActivityDetails = {
   subject?: string | null;
@@ -34,16 +37,27 @@ export type WaterActivityDetails = {
   cupCount?: number;
 };
 
+export type QuestActivityDetails = {
+  type: 'quest';
+  questId: string;
+  title: string;
+  executionType: Extract<AIQuestExecutionType, 'simple' | 'my_time'>;
+  aiQuestLevel?: AIQuestLevel;
+  durationMinutes?: number;
+};
+
 export type ActivityDetails =
   | StudyActivityDetails
   | CleaningActivityDetails
   | ShowerActivityDetails
-  | WaterActivityDetails;
+  | WaterActivityDetails
+  | QuestActivityDetails;
 
 export type ActivityRecord = {
   activityId: string;
   userId: string;
-  categoryId: ActivityCategory;
+  categoryId: ActivityRecordCategory;
+  rewardCategory?: ActivityCategory | null;
   status: ActivityStatus;
   dateKey: string;
   startedAt: Timestamp | Date | string | null;
@@ -66,7 +80,7 @@ export type DailyActivitySummary = {
   showerCompletedCount: number;
   waterCupCount: number;
   waterAmountMl: number;
-  completedCategories: ActivityRecord['categoryId'][];
+  completedCategories: ActivityCategory[];
   createdAt: Timestamp | Date | string | null;
   updatedAt: Timestamp | Date | string | null;
 };

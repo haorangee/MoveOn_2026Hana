@@ -1,6 +1,7 @@
 import type { ActivityCategory } from '@/features/activity/constants/activityCategory';
 import type { AchievementUnlockResult } from '@/features/achievements/types/achievement';
 import type { RewardReason } from '@/features/activity/rewards/constants/rewardReason';
+import type { LevelChange } from '@/features/activity/levels/types/level';
 
 export interface RewardBreakdown {
   baseXp: number;
@@ -13,7 +14,7 @@ export interface RewardBreakdown {
 
 export interface ActivityRewardResult {
   activityId: string;
-  categoryId: ActivityCategory;
+  categoryId: ActivityCategory | null;
   earnedXp: number;
   earnedGrapes: number;
   isRewardEligible: boolean;
@@ -23,7 +24,7 @@ export interface ActivityRewardResult {
 
 export interface ProcessActivityRewardResult {
   activityId: string;
-  categoryId: ActivityCategory;
+  categoryId: ActivityCategory | null;
   processed: boolean;
   alreadyProcessed: boolean;
   rewardApplied: boolean;
@@ -31,12 +32,12 @@ export interface ProcessActivityRewardResult {
   earnedGrapes: number;
   newTotalXp: number;
   newTotalLevel: number;
-  newCategoryXp: number;
-  newCategoryLevel: number;
+  newCategoryXp: number | null;
+  newCategoryLevel: number | null;
   unlockedAchievements: AchievementUnlockResult[];
   achievementGrapesEarned: number;
-  totalLevelChange: import('@/features/activity/levels/types/level').LevelChange;
-  categoryLevelChange: import('@/features/activity/levels/types/level').LevelChange;
+  totalLevelChange: LevelChange;
+  categoryLevelChange: LevelChange | null;
   reward: ActivityRewardResult;
 }
 
@@ -65,7 +66,7 @@ export type RewardTransaction = {
   rewardId: string;
   activityId: string;
   userId: string;
-  categoryId: ActivityCategory;
+  categoryId: ActivityCategory | null;
   earnedXp: number;
   earnedGrapes: number;
   reason: RewardReason;
@@ -83,7 +84,7 @@ export type RewardTransaction = {
       didLevelUp: boolean;
       levelsGained: number;
     };
-    category: {
+    category?: {
       previousLevel: number;
       newLevel: number;
       didLevelUp: boolean;

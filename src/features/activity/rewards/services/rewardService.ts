@@ -1,6 +1,6 @@
 import { doc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { firestore } from '@/config/firebase';
-import { ACTIVITY_CATEGORY } from '@/features/activity/constants/activityCategory';
+import { ACTIVITY_CATEGORY, type ActivityCategory } from '@/features/activity/constants/activityCategory';
 import { ACTIVITY_STATUS } from '@/features/activity/constants/activityStatus';
 import {
   categoryProgressRef,
@@ -31,6 +31,15 @@ import type { ActivityRecord } from '@/features/activity/types/activity';
 import { createDateKey } from '@/features/activity/utils/dateKey';
 import { REWARD_POLICY } from '@/features/activity/rewards/constants/rewardPolicy';
 
+function isActivityCategory(value: unknown): value is ActivityCategory {
+  return Object.values(ACTIVITY_CATEGORY).includes(value as ActivityCategory);
+}
+
+function getEffectiveRewardCategory(activity: ActivityRecord) {
+  if (activity.rewardCategory !== undefined) return activity.rewardCategory;
+  return isActivityCategory(activity.categoryId) ? activity.categoryId : null;
+}
+
 function rewardTransactionId(activityId: string) {
   return activityId;
 }
@@ -51,7 +60,7 @@ function defaultDailyContext(): DailyRewardContext {
   };
 }
 
-function defaultCategoryProgress(categoryId: ActivityRecord['categoryId']): CategoryRewardProgress {
+function defaultCategoryProgress(categoryId: ActivityCategory): CategoryRewardProgress {
   return {
     categoryId,
     xp: 0,
@@ -69,6 +78,10 @@ function nextContextFromReward(
   context: DailyRewardContext,
   reward: ReturnType<typeof calculateActivityReward>,
 ): DailyRewardContext {
+  if ((activity.details as { type?: unknown }).type === 'quest') {
+    return context;
+  }
+
   switch (activity.categoryId) {
     case ACTIVITY_CATEGORY.STUDY:
       return { ...context, studyGrapesEarned: context.studyGrapesEarned + reward.earnedGrapes };
@@ -107,10 +120,11 @@ function emptyRewardResult(
   totalLevel = 1,
   categoryXp = 0,
   categoryLevel = 1,
+  categoryId = getEffectiveRewardCategory(activity),
 ): ProcessActivityRewardResult {
   return {
     activityId: activity.activityId,
-    categoryId: activity.categoryId,
+    categoryId,
     processed,
     alreadyProcessed,
     rewardApplied: false,
@@ -118,8 +132,8 @@ function emptyRewardResult(
     earnedGrapes: 0,
     newTotalXp: totalXp,
     newTotalLevel: totalLevel,
-    newCategoryXp: categoryXp,
-    newCategoryLevel: categoryLevel,
+    newCategoryXp: categoryId === null ? null : categoryXp,
+    newCategoryLevel: categoryId === null ? null : categoryLevel,
     ...emptyAchievementResult(),
     totalLevelChange: {
       previousLevel: totalLevel,
@@ -127,7 +141,7 @@ function emptyRewardResult(
       didLevelUp: false,
       levelsGained: 0,
     },
-    categoryLevelChange: {
+    categoryLevelChange: categoryId === null ? null : {
       previousLevel: categoryLevel,
       newLevel: categoryLevel,
       didLevelUp: false,
@@ -135,7 +149,7 @@ function emptyRewardResult(
     },
     reward: {
       activityId: activity.activityId,
-      categoryId: activity.categoryId,
+      categoryId,
       earnedXp: 0,
       earnedGrapes: 0,
       isRewardEligible: false,
@@ -165,14 +179,12 @@ export async function processActivityReward(activity: ActivityRecord): Promise<P
     const transactionRef = rewardTransactionRef(activity.userId, rewardId);
     const contextRef = rewardContextRef(activity.userId, dateKey);
     const userRef = profileRef(activity.userId);
-    const progressRef = categoryProgressRef(activity.userId, activity.categoryId);
 
-    const [activitySnap, transactionSnap, contextSnap, userSnap, progressSnap] = await Promise.all([
+    const [activitySnap, transactionSnap, contextSnap, userSnap] = await Promise.all([
       transaction.get(activityRef),
       transaction.get(transactionRef),
       transaction.get(contextRef),
       transaction.get(userRef),
-      transaction.get(progressRef),
     ]);
 
     if (!activitySnap.exists()) {
@@ -182,9 +194,20 @@ export async function processActivityReward(activity: ActivityRecord): Promise<P
     const currentActivity = activitySnap.data() as ActivityRecord;
     const previousTotalXp = Number((userSnap.exists() ? userSnap.data().totalXp : 0) ?? 0);
     const previousTotalLevel = calculateTotalLevelProgress(previousTotalXp);
-    const currentProgress = progressSnap.exists()
-      ? (progressSnap.data() as CategoryRewardProgress)
-      : defaultCategoryProgress(currentActivity.categoryId);
+    const currentContext = contextSnap.exists()
+      ? (contextSnap.data() as DailyRewardContext)
+      : defaultDailyContext();
+    const reward = calculateActivityReward(currentActivity, currentContext);
+    const effectiveRewardCategory = reward.categoryId;
+    const progressRef = effectiveRewardCategory === null
+      ? null
+      : categoryProgressRef(currentActivity.userId, effectiveRewardCategory);
+    const progressSnap = progressRef === null ? null : await transaction.get(progressRef);
+    const currentProgress = effectiveRewardCategory === null
+      ? null
+      : progressSnap?.exists()
+        ? (progressSnap.data() as CategoryRewardProgress)
+        : defaultCategoryProgress(effectiveRewardCategory);
 
     if (currentActivity.status !== ACTIVITY_STATUS.COMPLETED) {
       return emptyRewardResult(
@@ -194,8 +217,9 @@ export async function processActivityReward(activity: ActivityRecord): Promise<P
         currentActivity.rewardProcessed === true,
         previousTotalXp,
         previousTotalLevel.level,
-        currentProgress.xp,
-        currentProgress.level,
+        currentProgress?.xp ?? 0,
+        currentProgress?.level ?? 1,
+        effectiveRewardCategory,
       );
     }
 
@@ -207,53 +231,57 @@ export async function processActivityReward(activity: ActivityRecord): Promise<P
         true,
         previousTotalXp,
         previousTotalLevel.level,
-        currentProgress.xp,
-        currentProgress.level,
+        currentProgress?.xp ?? 0,
+        currentProgress?.level ?? 1,
+        effectiveRewardCategory,
       );
     }
-
-    const currentContext = contextSnap.exists()
-      ? (contextSnap.data() as DailyRewardContext)
-      : defaultDailyContext();
-    const reward = calculateActivityReward(currentActivity, currentContext);
 
     const nextTotalXp = previousTotalXp + Math.max(0, Math.floor(reward.earnedXp));
     const nextTotalLevel = calculateTotalLevelProgress(nextTotalXp);
     const totalLevelChange = calculateLevelChange(previousTotalXp, nextTotalXp, TOTAL_LEVEL_THRESHOLDS);
 
-    const nextCategoryXp = currentProgress.xp + Math.max(0, Math.floor(reward.earnedXp));
-    const nextCategoryLevel = calculateCategoryLevelProgress(nextCategoryXp);
-    const categoryLevelChange = calculateLevelChange(currentProgress.xp, nextCategoryXp, CATEGORY_LEVEL_THRESHOLDS);
+    const nextCategoryXp = currentProgress === null
+      ? null
+      : currentProgress.xp + Math.max(0, Math.floor(reward.earnedXp));
+    const nextCategoryLevel = nextCategoryXp === null
+      ? null
+      : calculateCategoryLevelProgress(nextCategoryXp);
+    const categoryLevelChange = currentProgress === null || nextCategoryXp === null
+      ? null
+      : calculateLevelChange(currentProgress.xp, nextCategoryXp, CATEGORY_LEVEL_THRESHOLDS);
 
-    const nextProgress = {
-      categoryId: currentActivity.categoryId,
-      xp: nextCategoryXp,
-      level: nextCategoryLevel.level,
-      completionCount: currentProgress.completionCount + 1,
-      totalGrapes: currentProgress.totalGrapes + Math.max(0, Math.floor(reward.earnedGrapes)),
-      lastRewardedAt: serverTimestamp(),
-      createdAt: currentProgress.createdAt ?? serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    } satisfies CategoryRewardProgress;
+    const nextProgress = currentProgress === null || effectiveRewardCategory === null || nextCategoryLevel === null
+      ? null
+      : {
+        categoryId: effectiveRewardCategory,
+        xp: nextCategoryXp ?? currentProgress.xp,
+        level: nextCategoryLevel.level,
+        completionCount: currentProgress.completionCount + 1,
+        totalGrapes: currentProgress.totalGrapes + Math.max(0, Math.floor(reward.earnedGrapes)),
+        lastRewardedAt: serverTimestamp(),
+        createdAt: currentProgress.createdAt ?? serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      } satisfies CategoryRewardProgress;
 
     const rewardTransaction: RewardTransaction = {
       rewardId,
       activityId: currentActivity.activityId,
       userId: currentActivity.userId,
-      categoryId: currentActivity.categoryId,
+      categoryId: effectiveRewardCategory,
       earnedXp: reward.earnedXp,
       earnedGrapes: reward.earnedGrapes,
       reason: reward.reason,
       breakdown: reward.breakdown,
       previousTotalLevel: previousTotalLevel.level,
       newTotalLevel: nextTotalLevel.level,
-      previousCategoryLevel: currentProgress.level,
-      newCategoryLevel: nextCategoryLevel.level,
+      previousCategoryLevel: currentProgress?.level,
+      newCategoryLevel: nextCategoryLevel?.level,
       totalLevelUp: totalLevelChange.didLevelUp,
-      categoryLevelUp: categoryLevelChange.didLevelUp,
+      categoryLevelUp: categoryLevelChange?.didLevelUp ?? false,
       levelChanges: {
         total: totalLevelChange,
-        category: categoryLevelChange,
+        ...(categoryLevelChange ? { category: categoryLevelChange } : {}),
       },
       createdAt: serverTimestamp(),
     };
@@ -270,7 +298,9 @@ export async function processActivityReward(activity: ActivityRecord): Promise<P
       dateKey,
       updatedAt: serverTimestamp(),
     }, { merge: true });
-    transaction.set(progressRef, nextProgress, { merge: true });
+    if (progressRef && nextProgress) {
+      transaction.set(progressRef, nextProgress, { merge: true });
+    }
     transaction.set(activityRef, {
       rewardProcessed: true,
       rewardProcessedAt: serverTimestamp(),
@@ -279,7 +309,7 @@ export async function processActivityReward(activity: ActivityRecord): Promise<P
 
     return {
       activityId: currentActivity.activityId,
-      categoryId: currentActivity.categoryId,
+      categoryId: effectiveRewardCategory,
       processed: true,
       alreadyProcessed: false,
       rewardApplied: reward.isRewardEligible,
@@ -287,8 +317,8 @@ export async function processActivityReward(activity: ActivityRecord): Promise<P
       earnedGrapes: reward.earnedGrapes,
       newTotalXp: nextTotalXp,
       newTotalLevel: nextTotalLevel.level,
-      newCategoryXp: nextProgress.xp,
-      newCategoryLevel: nextProgress.level,
+      newCategoryXp: nextProgress?.xp ?? null,
+      newCategoryLevel: nextProgress?.level ?? null,
       ...emptyAchievementResult(),
       totalLevelChange,
       categoryLevelChange,
