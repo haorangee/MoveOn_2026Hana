@@ -19,12 +19,16 @@ import type {
   AIQuestOption,
   AIQuestResponse,
 } from '@/contracts/ai-quest';
+import { firebaseAuth } from '@/config/firebaseAuth';
 import { getMvpPetCatalogItem } from '@/features/customization/catalogs/petCatalog';
 import { useOnboarding } from '@/features/onboarding/OnboardingProvider';
+import { savePendingWaterQuestId } from '@/features/quests/services/questActivityLinkService';
 import {
   AIQuestServiceError,
   generateAIQuests,
 } from '@/features/quests/services/aiQuestService';
+import { createQuestFromDraft } from '@/features/quests/services/questService';
+import { mapAIQuestOptionToQuestDraft } from '@/features/quests/utils/aiQuestMapping';
 
 const INITIAL_PET_MESSAGE = `안녕, 나한테 그냥 편하게 말해줘.
 지금 뭐가 제일 하기 싫거나 막막해?
@@ -53,6 +57,8 @@ function getErrorMessage(error: unknown) {
     case 'invalid_argument':
       return '내용을 한 번만 확인해줄래?';
     case 'unavailable':
+      return '연결이 잠깐 불안정한 것 같아. 한 번만 다시 해볼까?';
+    case 'internal':
       return '앗, 퀘스트를 고르는 중에 잠깐 꼬였어. 한 번만 다시 해볼까?';
     case 'invalid_response':
     case 'unknown':
@@ -62,6 +68,7 @@ function getErrorMessage(error: unknown) {
 }
 
 type QuestChoiceCardProps = {
+  disabled: boolean;
   index: number;
   isSelected: boolean;
   onPress: () => void;
@@ -69,6 +76,7 @@ type QuestChoiceCardProps = {
 };
 
 function QuestChoiceCard({
+  disabled,
   index,
   isSelected,
   onPress,
@@ -77,12 +85,14 @@ function QuestChoiceCard({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ selected: isSelected }}
+      accessibilityState={{ disabled, selected: isSelected }}
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.questCard,
         isSelected && styles.questCardSelected,
-        pressed && styles.pressed,
+        pressed && !disabled && styles.pressed,
+        disabled && styles.questCardDisabled,
       ]}
     >
       <View style={styles.questNumberWrap}>
@@ -123,6 +133,7 @@ function QuestChoiceCard({
 export default function AIQuestChatScreen() {
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
+  const startingRef = useRef(false);
   const { profile } = useOnboarding();
   const pet = useMemo(
     () => getMvpPetCatalogItem(profile.petId, profile.petSpecies),
@@ -136,6 +147,8 @@ export default function AIQuestChatScreen() {
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<AIQuestResponse | null>(null);
   const [selectedQuestId, setSelectedQuestId] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
 
   const requestAIQuests = async (message: string) => {
     if (isLoading) return;
@@ -144,6 +157,7 @@ export default function AIQuestChatScreen() {
     setError(null);
     setResponse(null);
     setSelectedQuestId(null);
+    setStartError(null);
 
     try {
       const nextResponse = await generateAIQuests({
@@ -172,17 +186,63 @@ export default function AIQuestChatScreen() {
     void requestAIQuests(submittedMessage);
   };
 
-  const handleStartSelected = () => {
-    if (!selectedQuestId || !response) return;
+  const handleStartSelected = async () => {
+    if (!selectedQuestId || !response || startingRef.current) return;
 
-    if (typeof __DEV__ !== 'undefined' && __DEV__) {
-      const selectedQuest = response.quests.find(
-        (quest) => quest.id === selectedQuestId,
-      );
-      console.info('AI Quest selected for the next implementation step.', {
-        id: selectedQuest?.id,
-        title: selectedQuest?.title,
-      });
+    const selectedQuest = response.quests.find(
+      (quest) => quest.id === selectedQuestId,
+    );
+    if (!selectedQuest) return;
+
+    startingRef.current = true;
+    setIsStarting(true);
+    setStartError(null);
+
+    try {
+      await firebaseAuth.authStateReady();
+      const userId = firebaseAuth.currentUser?.uid;
+      if (!userId) {
+        throw new Error('로그인 정보를 확인할 수 없어요.');
+      }
+
+      const draft = mapAIQuestOptionToQuestDraft(selectedQuest);
+      const createdQuest = await createQuestFromDraft(userId, draft);
+      const params = {
+        questId: createdQuest.id,
+        fromQuest: '1',
+      };
+
+      switch (createdQuest.executionType) {
+        case 'study':
+          router.push({ pathname: '/study-desk', params });
+          return;
+        case 'cleaning':
+          router.push({ pathname: '/cleaning', params });
+          return;
+        case 'shower':
+          router.push({ pathname: '/shower', params });
+          return;
+        case 'water':
+          await savePendingWaterQuestId(createdQuest.id);
+          router.replace('/' as Href);
+          return;
+        case 'simple':
+          router.push({ pathname: '/quest-simple', params: { questId: createdQuest.id } });
+          return;
+        case 'my_time':
+          router.push({ pathname: '/my-time', params: { questId: createdQuest.id } });
+          return;
+        default:
+          throw new Error('아직 시작할 수 없는 퀘스트예요.');
+      }
+    } catch (startQuestError) {
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        console.warn('Failed to save or start selected AI Quest.', startQuestError);
+      }
+      setStartError('퀘스트를 시작하지 못했어. 잠시 후 다시 시도해줘.');
+    } finally {
+      startingRef.current = false;
+      setIsStarting(false);
     }
   };
 
@@ -306,26 +366,38 @@ export default function AIQuestChatScreen() {
                 {response.quests.map((quest, index) => (
                   <QuestChoiceCard
                     key={quest.id}
+                    disabled={isStarting}
                     index={index}
                     isSelected={selectedQuestId === quest.id}
-                    onPress={() => setSelectedQuestId(quest.id)}
+                    onPress={() => {
+                      setSelectedQuestId(quest.id);
+                      setStartError(null);
+                    }}
                     quest={quest}
                   />
                 ))}
               </View>
 
+              {startError ? <Text style={styles.startError}>{startError}</Text> : null}
+
               <Pressable
                 accessibilityRole="button"
-                disabled={!selectedQuestId}
-                onPress={handleStartSelected}
+                disabled={!selectedQuestId || isStarting}
+                onPress={() => void handleStartSelected()}
                 style={({ pressed }) => [
                   styles.startButton,
-                  !selectedQuestId && styles.startButtonDisabled,
-                  pressed && selectedQuestId && styles.pressed,
+                  (!selectedQuestId || isStarting) && styles.startButtonDisabled,
+                  pressed && selectedQuestId && !isStarting && styles.pressed,
                 ]}
               >
-                <Ionicons color="#FFF9F0" name="play" size={17} />
-                <Text style={styles.startButtonText}>이걸로 시작할게</Text>
+                {isStarting ? (
+                  <ActivityIndicator color="#FFF9F0" size="small" />
+                ) : (
+                  <Ionicons color="#FFF9F0" name="play" size={17} />
+                )}
+                <Text style={styles.startButtonText}>
+                  {isStarting ? '준비하는 중…' : '이걸로 시작할게'}
+                </Text>
               </Pressable>
             </View>
           ) : null}
@@ -636,6 +708,14 @@ const styles = StyleSheet.create({
     marginTop: 13,
     gap: 10,
   },
+  startError: {
+    marginTop: 12,
+    color: '#A85F73',
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
   questCard: {
     minHeight: 104,
     padding: 14,
@@ -655,6 +735,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 10,
     elevation: 3,
+  },
+  questCardDisabled: {
+    opacity: 0.72,
   },
   questNumberWrap: {
     width: 31,

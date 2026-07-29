@@ -1,5 +1,5 @@
-import { FirebaseError } from 'firebase/app';
 import { httpsCallable } from 'firebase/functions';
+import { firebaseAuth } from '@/config/firebaseAuth';
 import { firebaseFunctions } from '@/config/firebaseFunctions';
 import type {
   AIQuestCategory,
@@ -14,6 +14,7 @@ export type AIQuestServiceErrorCode =
   | 'unauthenticated'
   | 'invalid_argument'
   | 'unavailable'
+  | 'internal'
   | 'invalid_response'
   | 'unknown';
 
@@ -60,6 +61,24 @@ const generateAIQuestsCallable = httpsCallable<
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function getErrorIdentity(error: unknown): { code: string; name: string } {
+  if (!isRecord(error)) {
+    return {
+      code: 'unknown',
+      name: error instanceof Error ? error.name : typeof error,
+    };
+  }
+
+  return {
+    code: typeof error.code === 'string' ? error.code : 'unknown',
+    name: typeof error.name === 'string' ? error.name : 'unknown',
+  };
+}
+
+function isDevelopment() {
+  return typeof __DEV__ !== 'undefined' && __DEV__;
 }
 
 function isAIQuestOption(value: unknown): value is AIQuestOption {
@@ -138,15 +157,12 @@ function normalizeRequest(
 }
 
 function normalizeFirebaseError(error: unknown): AIQuestServiceError {
-  if (!(error instanceof FirebaseError)) {
-    return new AIQuestServiceError(
-      'unknown',
-      'AI Quest를 불러오지 못했어요.',
-    );
-  }
+  const { code } = getErrorIdentity(error);
 
-  switch (error.code) {
+  switch (code) {
     case 'functions/unauthenticated':
+    case 'auth/user-token-expired':
+    case 'auth/invalid-user-token':
       return new AIQuestServiceError(
         'unauthenticated',
         '로그인 후 AI Quest를 이용할 수 있어요.',
@@ -157,9 +173,17 @@ function normalizeFirebaseError(error: unknown): AIQuestServiceError {
         'AI Quest 요청 내용을 확인해 주세요.',
       );
     case 'functions/unavailable':
+    case 'functions/deadline-exceeded':
+    case 'functions/resource-exhausted':
+    case 'auth/network-request-failed':
       return new AIQuestServiceError(
         'unavailable',
         'AI Quest 연결이 잠시 지연되고 있어요. 다시 시도해 주세요.',
+      );
+    case 'functions/internal':
+      return new AIQuestServiceError(
+        'internal',
+        'AI Quest를 처리하는 중 서버 오류가 발생했어요.',
       );
     default:
       return new AIQuestServiceError(
@@ -175,7 +199,32 @@ export async function generateAIQuests(
   const payload = normalizeRequest(request);
 
   try {
+    await firebaseAuth.authStateReady();
+
+    const currentUser = firebaseAuth.currentUser;
+
+    if (isDevelopment()) {
+      console.info('[AIQuest] auth ready');
+      console.info('[AIQuest] has current user:', Boolean(currentUser));
+      console.info('[AIQuest] user anonymous:', currentUser?.isAnonymous ?? false);
+    }
+
+    if (!currentUser) {
+      throw new AIQuestServiceError(
+        'unauthenticated',
+        '로그인 후 AI Quest를 이용할 수 있어요.',
+      );
+    }
+
+    if (isDevelopment()) {
+      console.info('[AIQuest] calling generateAIQuests');
+    }
+
     const result = await generateAIQuestsCallable(payload);
+
+    if (isDevelopment()) {
+      console.info('[AIQuest] generateAIQuests success');
+    }
 
     if (!isAIQuestResponse(result.data)) {
       throw new AIQuestServiceError(
@@ -188,6 +237,13 @@ export async function generateAIQuests(
   } catch (error: unknown) {
     if (error instanceof AIQuestServiceError) {
       throw error;
+    }
+
+    if (isDevelopment()) {
+      console.warn(
+        '[AIQuest] callable failed',
+        JSON.stringify(getErrorIdentity(error)),
+      );
     }
 
     throw normalizeFirebaseError(error);

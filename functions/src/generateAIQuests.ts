@@ -234,8 +234,7 @@ export const generateAIQuests = onCall<unknown, Promise<AIQuestResponse>>(
 
       logger.info("generateAIQuests succeeded", {
         mode: request.mode,
-        questCount: result.quests.length,
-        ...(requestId ? {openAIRequestId: requestId} : {}),
+        hasRequestId: Boolean(requestId),
       });
 
       return toAIQuestResponse(result);
@@ -244,9 +243,7 @@ export const generateAIQuests = onCall<unknown, Promise<AIQuestResponse>>(
       logger.error("generateAIQuests failed", {
         mode: request.mode,
         errorKind: details.kind,
-        ...(details.requestId ? {
-          openAIRequestId: details.requestId,
-        } : {}),
+        hasRequestId: Boolean(details.requestId),
       });
 
       throw new HttpsError(
