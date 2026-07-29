@@ -333,6 +333,24 @@ export default function QuestScreen() {
             </View>
           </View>
 
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/ai-quest' as Href)}
+            style={({ pressed }) => [styles.aiQuestEntry, pressed && styles.pressed]}
+          >
+            <View style={styles.aiQuestEntryIcon}>
+              <Ionicons color="#A96578" name="paw-outline" size={21} />
+            </View>
+            <View style={styles.aiQuestEntryCopy}>
+              <Text style={styles.aiQuestEntryKicker}>PET QUEST</Text>
+              <Text style={styles.aiQuestEntryTitle}>펫에게 퀘스트 추천받기</Text>
+              <Text style={styles.aiQuestEntryText}>
+                막막한 일을 편하게 말하면 작은 시작 세 개를 골라줘요.
+              </Text>
+            </View>
+            <Ionicons color="#A96578" name="chevron-forward" size={19} />
+          </Pressable>
+
           {notice ? (
             <Pressable
               accessibilityRole="button"
@@ -594,6 +612,47 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 999,
     backgroundColor: '#D48A9A',
+  },
+  aiQuestEntry: {
+    marginTop: 13,
+    padding: 13,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E8CAD3',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    backgroundColor: '#FFF4F7',
+  },
+  aiQuestEntryIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5DDE4',
+  },
+  aiQuestEntryCopy: {
+    flex: 1,
+  },
+  aiQuestEntryKicker: {
+    color: '#B97889',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  aiQuestEntryTitle: {
+    marginTop: 2,
+    color: '#5D414A',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  aiQuestEntryText: {
+    marginTop: 3,
+    color: '#8C6A73',
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: '700',
   },
   notice: {
     marginTop: 13,
